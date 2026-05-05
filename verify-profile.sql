@@ -1,0 +1,2 @@
+-- VERIFICAR SE O PERFIL FOI CRIADO
+SELECT * FROM profiles WHERE user_id = 'cfce857c-7d22-4450-abe6-fc234a13c75a';
