@@ -369,13 +369,21 @@ export default function ResultPage() {
                 const profile = discProfiles[key];
                 const isDominant = dominantProfile === key;
 
+                // Cores fixas para cada perfil
+                const colors = {
+                  D: { bg: '#ef4444', text: 'text-red-500' },
+                  I: { bg: '#eab308', text: 'text-yellow-500' },
+                  S: { bg: '#22c55e', text: 'text-green-500' },
+                  C: { bg: '#3b82f6', text: 'text-blue-500' },
+                };
+
                 return (
                   <div key={key}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <div
                           className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: `var(--${profile.color}-500)` }}
+                          style={{ backgroundColor: colors[key].bg }}
                         />
                         <span className="text-white font-semibold">
                           {profile.name} ({key})
@@ -390,8 +398,11 @@ export default function ResultPage() {
                     </div>
                     <div className="h-3 bg-gray-900 rounded-full overflow-hidden">
                       <div
-                        className={`h-full bg-${profile.color}-500 transition-all duration-1000 ease-out`}
-                        style={{ width: `${percentage}%` }}
+                        className="h-full transition-all duration-1000 ease-out"
+                        style={{ 
+                          width: `${percentage}%`,
+                          backgroundColor: colors[key].bg
+                        }}
                       />
                     </div>
                   </div>
