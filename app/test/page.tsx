@@ -188,6 +188,18 @@ export default function TestPage() {
           };
         });
 
+        // DEBUG: Verificar respostas
+        console.log('[Test] Extended answers:', {
+          totalAnswers: extendedAnswers.length,
+          sample: extendedAnswers.slice(0, 3),
+          discTypesDistribution: extendedAnswers.reduce((acc, a) => {
+            a.selectedOptions.forEach(opt => {
+              acc[opt.type] = (acc[opt.type] || 0) + 1;
+            });
+            return acc;
+          }, {} as Record<string, number>),
+        });
+
         // Obter sessão atual do Supabase
         console.log('[Test] Getting current session...');
         const { supabase } = await import('@/lib/supabase/client');
