@@ -469,11 +469,6 @@ export default function ResultPage() {
               </div>
             </div>
           )}
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Seu Estilo Psicológico */}
           {psychologicalProfile && (
