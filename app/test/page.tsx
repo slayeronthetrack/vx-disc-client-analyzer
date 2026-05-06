@@ -24,6 +24,10 @@ interface Answer {
 export default function TestPage() {
   const router = useRouter();
   const { user, profile, hasProfile, loading: authLoading } = useAuth();
+  const [showQuestionSelection, setShowQuestionSelection] = useState(true);
+  const [questionCount, setQuestionCount] = useState(20);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [dynamicQuestions, setDynamicQuestions] = useState<any[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [saving, setSaving] = useState(false);
@@ -43,17 +47,85 @@ export default function TestPage() {
     }
   }, [user, hasProfile, authLoading, router]);
 
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
-  const isLastQuestion = currentQuestion === questions.length - 1;
+  const activeQuestions = dynamicQuestions.length > 0 ? dynamicQuestions : questions;
+  const totalQuestions = activeQuestions.length; // Fonte única de verdade
+  const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+  const isLastQuestion = currentQuestion === totalQuestions - 1;
   
   // Verificar quantas respostas foram selecionadas para a pergunta atual
-  const currentAnswerData = answers.find(a => a.questionId === questions[currentQuestion].id);
+  const currentAnswerData = answers.find(a => a.questionId === activeQuestions[currentQuestion].id);
   const selectedCount = currentAnswerData?.discTypes.length || 0;
-  const hasMinimumAnswers = selectedCount >= 2;
-  const hasMaximumAnswers = selectedCount >= 2;
+  const hasMinimumAnswers = selectedCount >= 1; // Mínimo 1 seleção
+  const hasMaximumAnswers = selectedCount >= 2; // Máximo 2 seleções
+
+  const handleGenerateQuestions = async (count: number) => {
+    if (!user || !profile) return;
+
+    setLoadingQuestions(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/ai/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          userName: profile.full_name,
+          userEmail: profile.email,
+          jobTitle: profile.job_title,
+          company: profile.company,
+          testObjective: profile.test_objective,
+          questionCount: count,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao gerar perguntas');
+      }
+
+      const data = await response.json();
+      
+      console.log('[Test] Questions generated:', {
+        count: data.questions.length,
+        source: data.source,
+        hasIntegratedProfile: data.metadata?.hasIntegratedProfile,
+      });
+
+      // Formatar perguntas para o formato esperado
+      const formattedQuestions = data.questions.map((q: any) => ({
+        id: q.id,
+        text: q.question,
+        options: q.options.map((opt: any) => ({
+          text: opt.text,
+          discType: opt.type,
+          valueType: opt.valueType,
+          psychTraits: opt.psychTraits,
+        })),
+      }));
+
+      setDynamicQuestions(formattedQuestions);
+      setShowQuestionSelection(false);
+    } catch (err: any) {
+      console.error('Error generating questions:', err);
+      setError(err.message || 'Erro ao gerar perguntas. Tente novamente.');
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  const handleStartTest = () => {
+    if (questionCount === 20) {
+      // Usar perguntas estáticas
+      setDynamicQuestions([]);
+      setShowQuestionSelection(false);
+    } else {
+      // Gerar perguntas dinâmicas
+      handleGenerateQuestions(questionCount);
+    }
+  };
 
   const handleAnswer = (discType: DISCType) => {
-    const currentAnswer = answers.find(a => a.questionId === questions[currentQuestion].id);
+    const currentAnswer = answers.find(a => a.questionId === activeQuestions[currentQuestion].id);
     
     if (currentAnswer) {
       // Se já existe resposta para esta pergunta
@@ -64,11 +136,11 @@ export default function TestPage() {
         const newDiscTypes = currentAnswer.discTypes.filter(t => t !== discType);
         if (newDiscTypes.length === 0) {
           // Se não sobrou nenhuma, remover a resposta
-          setAnswers(answers.filter(a => a.questionId !== questions[currentQuestion].id));
+          setAnswers(answers.filter(a => a.questionId !== activeQuestions[currentQuestion].id));
         } else {
           // Atualizar com as respostas restantes
           setAnswers(answers.map(a => 
-            a.questionId === questions[currentQuestion].id 
+            a.questionId === activeQuestions[currentQuestion].id 
               ? { ...a, discTypes: newDiscTypes }
               : a
           ));
@@ -77,7 +149,7 @@ export default function TestPage() {
         // Adicionar nova seleção (máximo 2)
         if (currentAnswer.discTypes.length < 2) {
           setAnswers(answers.map(a => 
-            a.questionId === questions[currentQuestion].id 
+            a.questionId === activeQuestions[currentQuestion].id 
               ? { ...a, discTypes: [...a.discTypes, discType] }
               : a
           ));
@@ -86,7 +158,7 @@ export default function TestPage() {
     } else {
       // Primeira seleção para esta pergunta
       setAnswers([...answers, {
-        questionId: questions[currentQuestion].id,
+        questionId: activeQuestions[currentQuestion].id,
         discTypes: [discType],
       }]);
     }
@@ -100,67 +172,120 @@ export default function TestPage() {
       setError('');
 
       try {
-        // Calcular resultado (cada resposta conta)
-        const scores = { D: 0, I: 0, S: 0, C: 0 };
-        answers.forEach(answer => {
-          answer.discTypes.forEach(discType => {
-            scores[discType]++;
-          });
+        // Preparar respostas no formato estendido
+        const extendedAnswers = answers.map(a => {
+          const question = activeQuestions.find(q => q.id === a.questionId);
+          return {
+            questionId: a.questionId,
+            selectedOptions: a.discTypes.map(discType => {
+              const option = question?.options.find((opt: any) => opt.discType === discType);
+              return {
+                type: discType,
+                valueType: option?.valueType,
+                psychTraits: option?.psychTraits,
+              };
+            }),
+          };
         });
 
-        // Determinar perfil dominante
-        const dominant = (Object.keys(scores) as Array<keyof typeof scores>).reduce((a, b) =>
-          scores[a] > scores[b] ? a : b
-        );
+        // Obter sessão atual do Supabase
+        console.log('[Test] Getting current session...');
+        const { supabase } = await import('@/lib/supabase/client');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        console.log('[Test] Session before calculate-result:', {
+          hasSession: !!session,
+          hasAccessToken: !!session?.access_token,
+          userId: session?.user?.id,
+          userIdMatch: session?.user?.id === user.id,
+        });
 
-        // Chamar API de IA para análise
-        let aiAnalysis = '';
-        try {
-          const aiResponse = await fetch('/api/ai/calculate-result', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              answers: answers.map(a => ({
-                questionId: a.questionId,
-                discTypes: a.discTypes,
-              })),
-              scores,
-              dominantProfile: dominant,
-              userProfile: profile,
-            }),
-          });
-
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            aiAnalysis = aiData.analysis || '';
-          }
-        } catch (aiError) {
-          console.error('Error getting AI analysis:', aiError);
-          // Continuar sem análise IA
+        // Validar sessão
+        if (sessionError || !session?.access_token) {
+          console.error('[Test] Session error:', sessionError);
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
         }
 
-        // Salvar no Supabase
-        await discTestService.saveTest(user.id, {
-          questions: questions.map(q => ({ id: q.id, text: q.text })),
-          answers: answers.map(a => ({
-            questionId: a.questionId,
-            discTypes: a.discTypes,
-          })),
-          result: {
-            dominantProfile: dominant,
-            scores,
-            aiAnalysis,
+        // Chamar API de IA para análise (já calcula perfil integrado)
+        console.log('[Test] Calling calculate-result API with Authorization header...');
+        
+        const aiResponse = await fetch('/api/ai/calculate-result', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`, // ← Envia token JWT
           },
-          scores,
-          dominant_profile: dominant,
-          ai_analysis: aiAnalysis,
+          credentials: 'include', // ← Mantém cookies como fallback
+          body: JSON.stringify({
+            userId: user.id,
+            userName: profile?.full_name,
+            userEmail: profile?.email,
+            jobTitle: profile?.job_title,
+            company: profile?.company,
+            testObjective: profile?.test_objective,
+            questions: activeQuestions.map(q => ({
+              id: q.id,
+              question: q.text,
+              options: q.options.map((opt: any) => ({
+                text: opt.text,
+                type: opt.discType,
+                valueType: opt.valueType,
+                psychTraits: opt.psychTraits,
+              })),
+            })),
+            answers: extendedAnswers,
+          }),
         });
+
+        if (!aiResponse.ok) {
+          const errorText = await aiResponse.text();
+          let errorData: any = {};
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { raw: errorText };
+          }
+          
+          console.error('[Test] API error:', {
+            status: aiResponse.status,
+            statusText: aiResponse.statusText,
+            url: aiResponse.url,
+            headers: Object.fromEntries(aiResponse.headers.entries()),
+            errorData,
+            errorText,
+          });
+          
+          // Mensagem de erro mais específica
+          let errorMessage = 'Erro ao calcular resultado';
+          if (aiResponse.status === 401) {
+            errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+          } else if (aiResponse.status === 403) {
+            errorMessage = 'Acesso negado. Verifique suas permissões.';
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorText) {
+            errorMessage = errorText;
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        console.log('[Test] Result calculated successfully');
 
         // Redirecionar para resultado
         router.push('/result');
       } catch (err: any) {
-        console.error('Error saving test:', err);
-        setError(err.message || 'Erro ao salvar teste. Tente novamente.');
+        console.error('Error saving test:', {
+          message: err?.message,
+          code: err?.code,
+          details: err?.details,
+          hint: err?.hint,
+          stack: err?.stack,
+          fullError: err,
+        });
+        setError(err?.message || 'Erro ao salvar teste. Tente novamente.');
         setSaving(false);
       }
     } else {
@@ -174,7 +299,99 @@ export default function TestPage() {
     }
   };
 
-  const currentAnswer = answers.find(a => a.questionId === questions[currentQuestion].id);
+  const currentAnswer = answers.find(a => a.questionId === activeQuestions[currentQuestion].id);
+
+  // Tela de seleção de quantidade de perguntas
+  if (showQuestionSelection && !authLoading && user && hasProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-12">
+        <div className="container mx-auto px-4">
+          <div className="max-w-2xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-yellow-500 mb-6">
+                <span className="text-gray-900 font-bold text-3xl">VX</span>
+              </div>
+              <h1 className="text-4xl font-bold text-white mb-2">
+                Teste DISC Personalizado
+              </h1>
+              <p className="text-gray-400">
+                Escolha quantas perguntas você quer responder
+              </p>
+            </div>
+
+            {/* Seleção de quantidade */}
+            <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-8 mb-8">
+              <h3 className="text-xl font-bold text-white mb-6">
+                Quantas perguntas você quer responder?
+              </h3>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  { count: 20, label: 'Rápido', time: '~5 min', desc: 'Perguntas padrão' },
+                  { count: 40, label: 'Médio', time: '~10 min', desc: 'Análise mais detalhada' },
+                  { count: 60, label: 'Completo', time: '~15 min', desc: 'Análise profunda' },
+                  { count: 100, label: 'Máximo', time: '~25 min', desc: 'Análise completa com Valores e Tipos Psicológicos' },
+                ].map((option) => (
+                  <button
+                    key={option.count}
+                    onClick={() => setQuestionCount(option.count)}
+                    className={`w-full text-left p-6 rounded-xl border-2 transition-all duration-200 ${
+                      questionCount === option.count
+                        ? 'border-orange-500 bg-orange-500/10'
+                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-bold text-white">{option.count}</span>
+                        <span className="text-lg font-semibold text-white">{option.label}</span>
+                      </div>
+                      <span className="text-gray-400 text-sm">{option.time}</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">{option.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6">
+                  <p className="text-red-500 text-sm">{error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleStartTest}
+                disabled={loadingQuestions}
+                className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 text-gray-900 font-bold text-lg rounded-xl hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingQuestions ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                    Gerando perguntas...
+                  </>
+                ) : (
+                  <>
+                    Iniciar Teste
+                    <ArrowRight size={24} />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Info */}
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
+              <h4 className="text-white font-semibold mb-2">💡 Dica</h4>
+              <p className="text-gray-300 text-sm">
+                Quanto mais perguntas você responder, mais precisa será sua análise. 
+                Testes com 60+ perguntas incluem análise de Valores e Tipos Psicológicos!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (authLoading) {
     return (
@@ -238,7 +455,7 @@ export default function TestPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <span className="text-white font-medium">
-                Pergunta {currentQuestion + 1} de {questions.length}
+                Pergunta {currentQuestion + 1} de {totalQuestions}
               </span>
               <span className="text-orange-500 font-bold">
                 {Math.round(progress)}%
@@ -262,14 +479,14 @@ export default function TestPage() {
           {/* Question Card */}
           <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-8 mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">
-              {questions[currentQuestion].text}
+              {activeQuestions[currentQuestion].text}
             </h2>
             <p className="text-gray-400 text-sm mb-6">
-              Selecione exatamente 2 opções que mais se aplicam a você
+              Selecione até 2 opções que mais combinam com você
             </p>
 
             <div className="space-y-3">
-              {questions[currentQuestion].options.map((option, index) => {
+              {activeQuestions[currentQuestion].options.map((option: any, index: number) => {
                 const isSelected = currentAnswer?.discTypes.includes(option.discType) || false;
                 return (
                   <button
@@ -300,9 +517,11 @@ export default function TestPage() {
             {/* Contador de respostas */}
             <div className="mt-4 text-center">
               <span className={`text-sm font-medium ${
-                selectedCount === 2 ? 'text-green-500' : selectedCount > 0 ? 'text-yellow-500' : 'text-gray-500'
+                selectedCount === 0 ? 'text-gray-500' : 
+                selectedCount === 1 ? 'text-yellow-500' : 
+                'text-green-500'
               }`}>
-                {selectedCount}/2 opções selecionadas
+                {selectedCount}/2 selecionadas
               </span>
             </div>
           </div>
@@ -345,7 +564,7 @@ export default function TestPage() {
           {/* Help Text */}
           {!hasMinimumAnswers && (
             <p className="text-center text-gray-500 text-sm mt-4">
-              Selecione 2 opções para continuar
+              Selecione pelo menos 1 opção para continuar
             </p>
           )}
         </div>
