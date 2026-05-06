@@ -445,10 +445,7 @@ export default function ResultPage() {
                     <div key={key}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: 'var(--orange-500)' }}
-                          />
+                          <div className="w-3 h-3 rounded-full bg-orange-500" />
                           <span className="text-white font-semibold">
                             {VALUE_NAMES[valueKey]}
                           </span>
