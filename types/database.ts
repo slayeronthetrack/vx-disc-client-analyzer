@@ -5,6 +5,7 @@
 
 export type UserRole = 'user' | 'admin';
 export type DISCType = 'D' | 'I' | 'S' | 'C';
+export type QuestionSource = 'ai' | 'fallback' | 'legacy';
 
 export interface Profile {
   id: string;
@@ -66,6 +67,18 @@ export interface DISCTest {
   ai_analysis: string;
   dominant_profile: DISCType;
   scores: DISCScores;
+  question_count: number;
+  question_source: QuestionSource;
+  generated_questions?: any; // JSONB - estrutura completa das perguntas geradas
+  
+  // Novos campos - Integrated Profile
+  value_scores?: any; // JSONB - ValueScores
+  dominant_values?: string[]; // Array de ValueType
+  value_percentages?: any; // JSONB - ValuePercentages
+  psychological_scores?: any; // JSONB - PsychologicalScores
+  psychological_profile?: any; // JSONB - PsychologicalProfile
+  integrated_analysis?: string; // Análise integrada da Marina
+  
   created_at: string;
 }
 

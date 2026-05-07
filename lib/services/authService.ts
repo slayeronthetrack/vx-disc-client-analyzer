@@ -28,13 +28,30 @@ export const authService = {
    * Login
    */
   async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    console.log('[authService] Starting signIn...', { email });
+    const startTime = Date.now();
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      const duration = Date.now() - startTime;
+      console.log('[authService] signInWithPassword completed in', duration, 'ms');
 
-    if (error) throw error;
-    return data;
+      if (error) {
+        console.error('[authService] signIn error:', error);
+        throw error;
+      }
+      
+      console.log('[authService] signIn successful, user:', data.user?.id);
+      return data;
+    } catch (err) {
+      const duration = Date.now() - startTime;
+      console.error('[authService] signIn failed after', duration, 'ms:', err);
+      throw err;
+    }
   },
 
   /**

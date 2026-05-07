@@ -31,9 +31,14 @@ const profileNames = {
   C: 'Conformidade',
 };
 
-export default function FloatingChatWidget() {
+interface FloatingChatWidgetProps {
+  onClose?: () => void;
+  initialOpen?: boolean;
+}
+
+export default function FloatingChatWidget({ onClose, initialOpen = false }: FloatingChatWidgetProps = {}) {
   const { user } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -69,10 +74,10 @@ export default function FloatingChatWidget() {
         }));
         setMessages(formattedHistory);
       } else {
-        // Mensagem inicial personalizada
+        // Mensagem inicial personalizada - Lucas Ferreira
         const greeting = data.discContext
-          ? `Olá! Sou o Assistente VX. Vi que seu perfil DISC é ${profileNames[data.discContext.dominant_profile]}. Como posso ajudar você hoje?`
-          : 'Olá! Sou o Assistente VX. Como posso ajudar você hoje?';
+          ? `Olá! Eu sou Lucas Ferreira, consultor comercial da VX. Analisei seu perfil DISC (${profileNames[data.discContext.dominant_profile as keyof typeof profileNames]}) e posso te ajudar a transformar esse diagnóstico em ações práticas para vendas, comunicação e liderança. Por onde quer começar?`
+          : 'Olá! Eu sou Lucas Ferreira, consultor comercial da VX. Como posso ajudar você hoje?';
         
         setMessages([{ role: 'assistant', content: greeting }]);
       }
@@ -151,7 +156,7 @@ export default function FloatingChatWidget() {
       setMessages([
         {
           role: 'assistant',
-          content: 'Histórico limpo! Como posso ajudar você?',
+          content: 'Histórico limpo! Eu sou Lucas Ferreira, consultor comercial da VX. Como posso ajudar você?',
         },
       ]);
     }
@@ -179,8 +184,8 @@ export default function FloatingChatWidget() {
                   <MessageCircle size={20} className="text-gray-900" />
                 </div>
                 <div>
-                  <h3 className="text-white font-bold">Assistente VX</h3>
-                  <p className="text-gray-400 text-xs">Online • IA Personalizada</p>
+                  <h3 className="text-white font-bold">Lucas Ferreira</h3>
+                  <p className="text-gray-400 text-xs">Consultor Comercial • VX Comercial</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -192,7 +197,10 @@ export default function FloatingChatWidget() {
                   <Trash2 size={18} />
                 </button>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    setIsOpen(false);
+                    onClose?.();
+                  }}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   <X size={20} />

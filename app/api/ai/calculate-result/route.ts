@@ -7,10 +7,58 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { discTestService } from '@/lib/services/discTestService';
+import { learningSystem } from '@/lib/services/learningSystem';
 import { getAgentRegistry } from '@/lib/agents';
 import { calculateIntegratedProfile } from '@/utils/calculateIntegratedProfile';
 import type { DISCType } from '@/types/database';
 import type { ExtendedAnswer } from '@/types/integrated-profile';
+
+/**
+ * Processa feedback do teste para o sistema de aprendizado (assíncrono)
+ */
+async function processTestFeedback(feedback: {
+  testId: string;
+  userId: string;
+  questions: any[];
+  answers: any[];
+  userContext: {
+    jobTitle: string;
+    company?: string;
+    testObjective: string;
+  };
+  completionRate: number;
+  totalTime: number;
+  dominantProfile: string;
+}) {
+  try {
+    console.log('[Learning] Processing test feedback...');
+    
+    // Transformar respostas em formato de feedback
+    const questionFeedback = feedback.answers.map((answer, index) => ({
+      id: `q-${index + 1}`,
+      text: feedback.questions[index]?.question || '',
+      options: feedback.questions[index]?.options || [],
+      responseTime: 15000, // TODO: Capturar tempo real
+      wasChanged: false, // TODO: Rastrear mudanças
+      finalAnswer: answer.selectedOptions.map((opt: any) => opt.type),
+    }));
+
+    await learningSystem.processFeedback({
+      testId: feedback.testId,
+      userId: feedback.userId,
+      questions: questionFeedback,
+      userContext: feedback.userContext,
+      completionRate: feedback.completionRate,
+      totalTime: feedback.totalTime,
+      dominantProfile: feedback.dominantProfile,
+    });
+
+    console.log('[Learning] Feedback processed successfully');
+  } catch (error) {
+    console.error('[Learning] Error processing feedback:', error);
+    // Não lançar erro - aprendizado é opcional
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -299,7 +347,7 @@ export async function POST(request: Request) {
         dominant_profile: dominantProfile,
         scores,
         question_count: answers.length,
-        question_source: 'legacy',
+        question_source: 'legacy' as const,
         // Novos campos do perfil integrado
         value_scores: integratedProfile.values?.scores,
         dominant_values: integratedProfile.values 
@@ -322,6 +370,25 @@ export async function POST(request: Request) {
       await discTestService.saveTest(testPayload, supabaseWithAuth); // ← Passar o client autenticado com JWT
       
       console.log('[calculate-result] Test saved successfully');
+
+      // 🎓 LEARNING SYSTEM: Processar feedback do teste (assíncrono)
+      // Não bloqueia a resposta ao usuário
+      processTestFeedback({
+        testId: testPayload.user_id, // Usar user_id como identificador temporário
+        userId,
+        questions,
+        answers,
+        userContext: {
+          jobTitle: jobTitle || '',
+          company,
+          testObjective: testObjective || '',
+        },
+        completionRate: 1.0, // Teste foi concluído
+        totalTime: 0, // TODO: Calcular tempo total
+        dominantProfile,
+      }).catch(err => {
+        console.error('[calculate-result] Error processing feedback (non-blocking):', err);
+      });
     } catch (saveError: any) {
       console.error('[calculate-result] Error saving test:', {
         message: saveError?.message,

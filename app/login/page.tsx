@@ -16,48 +16,31 @@ import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshState } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Redirecionar se já estiver logado
   useEffect(() => {
-    if (!authLoading && user) {
-      redirectUser();
+    if (!authLoading && user && !isRedirecting) {
+      console.log('[Login] User already logged in, redirecting to /profile');
+      setIsRedirecting(true);
+      router.push('/profile');
     }
   }, [user, authLoading]);
 
-  const redirectUser = async () => {
-    if (!user) return;
-
-    try {
-      // Verificar perfil
-      const profile = await profileService.getProfile(user.id);
-      
-      if (!profile || !profile.profile_completed) {
-        router.push('/profile');
-        return;
-      }
-
-      // Verificar teste
-      const hasTest = await discTestService.hasCompletedTest(user.id);
-      
-      if (!hasTest) {
-        router.push('/test');
-        return;
-      }
-
-      router.push('/result');
-    } catch (err) {
-      console.error('Error redirecting user:', err);
-      router.push('/profile');
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Evitar múltiplos submits
+    if (loading) {
+      console.log('[Login] Already loading, ignoring submit');
+      return;
+    }
+    
     setError('');
     setLoading(true);
 
@@ -67,18 +50,27 @@ export default function LoginPage() {
         throw new Error('Preencha todos os campos');
       }
 
+      console.log('[Login] Attempting login...');
+      const startTime = Date.now();
+      
       // Login
-      await authService.signIn(email, password);
-
-      // Redirecionar será feito pelo useEffect
+      const result = await authService.signIn(email, password);
+      const loginTime = Date.now() - startTime;
+      
+      console.log('[Login] Login successful in', loginTime, 'ms, user:', result.user?.id);
+      
+      // Redirecionar imediatamente para /profile
+      // O middleware vai garantir que a sessão está válida
+      console.log('[Login] Redirecting to /profile...');
+      router.push('/profile');
+      
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('[Login] Login error:', err);
       setError(
         err.message === 'Invalid login credentials'
           ? 'Email ou senha incorretos'
           : err.message || 'Erro ao fazer login. Tente novamente.'
       );
-    } finally {
       setLoading(false);
     }
   };

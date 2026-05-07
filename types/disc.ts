@@ -15,6 +15,13 @@ export interface Question {
 export interface QuestionOption {
   text: string;
   discType: DiscType;
+  valueType?: 'theoretical' | 'economic' | 'aesthetic' | 'social' | 'political' | 'spiritual';
+  psychTraits?: {
+    energy?: 'introvert' | 'extrovert';
+    perception?: 'sensory' | 'intuitive';
+    decision?: 'rational' | 'emotional';
+    organization?: 'structured' | 'flexible';
+  };
 }
 
 export interface DISCScores {

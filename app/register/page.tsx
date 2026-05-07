@@ -26,9 +26,12 @@ export default function RegisterPage() {
   // Redirecionar se já estiver logado
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/profile');
+      console.log('[Register] User already logged in, redirecting to profile');
+      setTimeout(() => {
+        router.push('/profile');
+      }, 500);
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading]);
 
   const validateForm = () => {
     if (!fullName.trim()) {

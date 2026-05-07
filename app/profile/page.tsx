@@ -8,9 +8,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Save, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle, AlertCircle, History, Eye } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { profileService } from '@/lib/services/profileService';
+import { discTestService } from '@/lib/services/discTestService';
+import type { TestHistorySummary } from '@/types/history';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -22,6 +24,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [recentTests, setRecentTests] = useState<TestHistorySummary[]>([]);
+  const [loadingTests, setLoadingTests] = useState(false);
 
   // Redirecionar se não estiver logado
   useEffect(() => {
@@ -39,6 +43,27 @@ export default function ProfilePage() {
       setTestObjective(userProfile.test_objective || '');
     }
   }, [userProfile]);
+
+  // Carregar testes recentes
+  useEffect(() => {
+    if (user) {
+      loadRecentTests();
+    }
+  }, [user]);
+
+  const loadRecentTests = async () => {
+    if (!user) return;
+
+    try {
+      setLoadingTests(true);
+      const tests = await discTestService.getUserTestsSummary(user.id);
+      setRecentTests(tests.slice(0, 3)); // Apenas os 3 mais recentes
+    } catch (err) {
+      console.error('Error loading recent tests:', err);
+    } finally {
+      setLoadingTests(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +261,88 @@ export default function ProfilePage() {
               </button>
             </div>
           </form>
+
+          {/* Histórico de Testes */}
+          <div className="mt-8 bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <History className="text-orange-500" size={24} />
+                <h2 className="text-2xl font-bold text-white">
+                  Histórico de Testes
+                </h2>
+              </div>
+              {recentTests.length > 0 && (
+                <Link
+                  href="/history"
+                  className="text-orange-500 hover:text-orange-400 font-medium text-sm transition-colors"
+                >
+                  Ver todos →
+                </Link>
+              )}
+            </div>
+
+            {loadingTests ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                <p className="text-gray-400 text-sm">Carregando testes...</p>
+              </div>
+            ) : recentTests.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-400 mb-4">
+                  Você ainda não realizou nenhum teste.
+                </p>
+                <Link
+                  href="/test"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-gray-900 font-bold rounded-lg hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300"
+                >
+                  Fazer Primeiro Teste
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentTests.map((test) => {
+                  const profileColors = {
+                    D: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-500' },
+                    I: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-500' },
+                    S: { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-500' },
+                    C: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-500' },
+                  };
+                  const profile = profileColors[test.dominant_profile];
+                  const date = new Date(test.created_at).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  });
+
+                  return (
+                    <div
+                      key={test.id}
+                      className={`flex items-center justify-between p-4 bg-gray-900/50 border ${profile.border} rounded-lg hover:bg-gray-900 transition-all`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-full ${profile.bg} border ${profile.border} flex items-center justify-center`}>
+                          <span className={`${profile.text} font-bold`}>{test.dominant_profile}</span>
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">
+                            Perfil {test.dominant_profile} • {test.question_count} perguntas
+                          </p>
+                          <p className="text-gray-500 text-sm">{date}</p>
+                        </div>
+                      </div>
+                      <Link
+                        href={`/result?id=${test.id}`}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/20 border border-orange-500/30 text-orange-500 font-medium rounded-lg hover:bg-orange-500/30 transition-all"
+                      >
+                        <Eye size={16} />
+                        Ver
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

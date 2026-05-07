@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS disc_tests (
   ai_analysis TEXT,
   dominant_profile TEXT CHECK (dominant_profile IN ('D', 'I', 'S', 'C')),
   scores JSONB NOT NULL,
+  question_count INTEGER DEFAULT 20 NOT NULL,
+  question_source TEXT DEFAULT 'legacy' NOT NULL CHECK (question_source IN ('ai', 'fallback', 'legacy')),
+  generated_questions JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -47,6 +50,8 @@ CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 CREATE INDEX IF NOT EXISTS idx_disc_tests_user_id ON disc_tests(user_id);
 CREATE INDEX IF NOT EXISTS idx_disc_tests_created_at ON disc_tests(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_disc_tests_question_source ON disc_tests(question_source);
+CREATE INDEX IF NOT EXISTS idx_disc_tests_question_count ON disc_tests(question_count);
 CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_user_id ON ai_chat_messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_created_at ON ai_chat_messages(created_at DESC);
 

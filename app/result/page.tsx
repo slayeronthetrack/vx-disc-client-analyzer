@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Home, RotateCcw, Download, User, Sparkles, MessageCircle } from 'lucide-react';
+import { Home, RotateCcw, Download, User, Sparkles, MessageCircle, History } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { discTestService } from '@/lib/services/discTestService';
 import { generateDISCReport, downloadPDF } from '@/lib/services/pdfService';
@@ -94,12 +94,22 @@ export default function ResultPage() {
   const [generatingAnalysis, setGeneratingAnalysis] = useState(false);
   const [personalizedAnalysis, setPersonalizedAnalysis] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
+  const [testId, setTestId] = useState<string | null>(null);
   // Novos estados para perfil integrado
   const [valueProfile, setValueProfile] = useState<ValueProfile | null>(null);
   const [psychologicalProfile, setPsychologicalProfile] = useState<PsychologicalProfile | null>(null);
 
   useEffect(() => {
-    console.log('[Result] useEffect triggered', { authLoading, user: !!user });
+    // Verificar se há ID na URL
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) {
+      setTestId(id);
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('[Result] useEffect triggered', { authLoading, user: !!user, testId });
     
     // Timeout de segurança para evitar loading infinito
     const timeout = setTimeout(() => {
@@ -131,7 +141,7 @@ export default function ResultPage() {
       console.log('[Result] Cleanup timeout');
       clearTimeout(timeout);
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, testId]);
 
   const loadResult = async () => {
     if (!user) {
@@ -140,11 +150,15 @@ export default function ResultPage() {
     }
 
     try {
-      console.log('[Result] Loading test for user:', user.id);
+      console.log('[Result] Loading test for user:', user.id, 'testId:', testId);
       setLoading(true);
       setError(null);
       
-      const latestTest = await discTestService.getLatestTest(user.id);
+      // Se há testId, buscar teste específico, senão buscar o mais recente
+      const latestTest = testId 
+        ? await discTestService.getTestById(testId, user.id)
+        : await discTestService.getLatestTest(user.id);
+      
       console.log('[Result] Latest test:', latestTest ? 'Found' : 'Not found');
 
       if (!latestTest) {
@@ -159,6 +173,16 @@ export default function ResultPage() {
         scores: latestTest.scores as DISCScores,
         completedAt: latestTest.created_at,
         aiAnalysis: latestTest.integrated_analysis || latestTest.ai_analysis || null,
+      });
+
+      // DEBUG: Log scores para verificar dados
+      console.log('[Result] Scores loaded:', {
+        scores: latestTest.scores,
+        D: latestTest.scores?.D,
+        I: latestTest.scores?.I,
+        S: latestTest.scores?.S,
+        C: latestTest.scores?.C,
+        total: Object.values(latestTest.scores || {}).reduce((a: number, b: number) => a + b, 0),
       });
 
       setDominantProfile(latestTest.dominant_profile as 'D' | 'I' | 'S' | 'C');
@@ -200,9 +224,14 @@ export default function ResultPage() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!result || !profile) return;
+    if (!result || !profile) {
+      console.error('[PDF] Missing result or profile', { result: !!result, profile: !!profile });
+      alert('Dados insuficientes para gerar PDF. Por favor, refaça o teste.');
+      return;
+    }
 
     try {
+      console.log('[PDF] Starting PDF generation...');
       setGeneratingPDF(true);
 
       const pdfData = {
@@ -218,14 +247,32 @@ export default function ResultPage() {
         completedAt: result.completedAt,
       };
 
+      console.log('[PDF] PDF data prepared:', {
+        userName: pdfData.userProfile.full_name,
+        dominantProfile: pdfData.dominantProfile,
+        hasAnalysis: !!pdfData.aiAnalysis,
+      });
+
+      console.log('[PDF] Calling generateDISCReport...');
       const blob = await generateDISCReport(pdfData);
+      console.log('[PDF] Blob generated:', { size: blob.size, type: blob.type });
+
+      if (!blob || blob.size === 0) {
+        throw new Error('PDF gerado está vazio');
+      }
+
       const filename = `VX-DISC-${profile.full_name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+      console.log('[PDF] Downloading with filename:', filename);
+      
       downloadPDF(blob, filename);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      console.log('[PDF] Download initiated successfully');
+    } catch (error: any) {
+      console.error('[PDF] Error generating PDF:', error);
+      console.error('[PDF] Error stack:', error.stack);
+      alert(`Erro ao gerar PDF: ${error.message || 'Erro desconhecido'}. Verifique o console para mais detalhes.`);
     } finally {
       setGeneratingPDF(false);
+      console.log('[PDF] PDF generation process completed');
     }
   };
 
@@ -365,7 +412,7 @@ export default function ResultPage() {
               {(Object.keys(result.scores) as Array<keyof DISCScores>).map((key) => {
                 const score = result.scores[key];
                 const total = Object.values(result.scores).reduce((a, b) => a + b, 0);
-                const percentage = (score / total) * 100;
+                const percentage = total > 0 ? (score / total) * 100 : 0;
                 const profile = discProfiles[key];
                 const isDominant = dominantProfile === key;
 
@@ -376,6 +423,22 @@ export default function ResultPage() {
                   S: { bg: '#22c55e', text: 'text-green-500' },
                   C: { bg: '#3b82f6', text: 'text-blue-500' },
                 };
+
+                // DEBUG: Log para verificar valores
+                console.log(`[DISC Bar ${key}]`, {
+                  score,
+                  total,
+                  percentage,
+                  percentageFixed: percentage.toFixed(0),
+                  width: `${percentage}%`,
+                  color: colors[key].bg,
+                  isDominant,
+                });
+
+                // Verificar se percentage é válido
+                if (isNaN(percentage)) {
+                  console.error(`[DISC Bar ${key}] Invalid percentage!`, { score, total });
+                }
 
                 return (
                   <div key={key}>
@@ -396,13 +459,16 @@ export default function ResultPage() {
                         {score} pts ({percentage.toFixed(0)}%)
                       </span>
                     </div>
-                    <div className="h-3 bg-gray-900 rounded-full overflow-hidden">
+                    <div className="h-3 bg-gray-900 rounded-full overflow-hidden relative">
+                      {/* Debug: Mostrar borda para verificar se o container está renderizando */}
                       <div
-                        className="h-full transition-all duration-1000 ease-out"
+                        className="h-full transition-all duration-1000 ease-out absolute top-0 left-0"
                         style={{ 
                           width: `${percentage}%`,
-                          backgroundColor: colors[key].bg
+                          backgroundColor: colors[key].bg,
+                          minWidth: percentage > 0 ? '2px' : '0px',
                         }}
+                        title={`${key}: ${percentage.toFixed(1)}% (${score}/${total})`}
                       />
                     </div>
                   </div>
@@ -736,6 +802,14 @@ export default function ResultPage() {
             >
               <Home size={20} />
               Voltar para Home
+            </Link>
+
+            <Link
+              href="/history"
+              className="flex items-center justify-center gap-3 px-6 py-4 bg-white/5 backdrop-blur-lg border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all duration-200"
+            >
+              <History size={20} />
+              Ver Histórico
             </Link>
 
             <button

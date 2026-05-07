@@ -1,208 +1,278 @@
-# 🚀 TESTE AGORA - INSTRUÇÕES FINAIS
+# 🧪 Como Testar Agora
 
-**Status:** ✅ Todos os testes automatizados passaram (7/7 - 100%)  
-**Servidor:** ✅ Rodando em http://localhost:3001  
-**Próxima ação:** 👉 **TESTE MANUAL NO NAVEGADOR**
+**Data**: 2026-05-06  
+**Status**: ✅ Pronto para testar
 
 ---
 
-## 🎯 O QUE FAZER AGORA (5 MINUTOS)
+## ⚡ MUDANÇAS APLICADAS
 
-### 1️⃣ Abrir Navegador
-```
-http://localhost:3001
-```
+### 1. ✅ Middleware com Session Refresh
+- Atualiza sessão automaticamente em cada request
+- Renova tokens antes de expirarem
+- Protege rotas privadas
 
-### 2️⃣ Fazer Login
-```
-Email: seu_email@exemplo.com
-Senha: sua_senha
-```
+### 2. ✅ Melhor Tratamento de Erros
+- Mensagens específicas por tipo de erro
+- Logs completos com headers e status
+- Usuário sabe exatamente o que fazer
 
-### 3️⃣ Completar Perfil (se necessário)
+### 3. ✅ Build Compilado com Sucesso
 ```
-Ir para: /profile
-Preencher:
-- Nome Completo
-- Cargo
-- Empresa
-- Objetivo (opcional)
-
-Clicar em "Salvar Perfil"
-```
-
-### 4️⃣ Fazer Teste Completo
-```
-Ir para: /test
-
-Para cada pergunta (10 no total):
-1. Selecionar 1ª opção → Contador mostra "1/2"
-2. Selecionar 2ª opção → Contador mostra "2/2" (verde)
-3. Verificar que outras opções ficam desabilitadas
-4. Clicar em "Próxima"
-
-Na última pergunta:
-- Clicar em "Finalizar Teste"
-- Aguardar "Salvando..."
-```
-
-### 5️⃣ Verificar Resultado
-```
-Página /result deve mostrar:
-
-✅ Perfil dominante (D, I, S ou C)
-✅ Descrição do perfil
-✅ Características principais
-✅ Gráfico de scores (D, I, S, C)
-✅ **Seção "Análise Personalizada com IA"** (roxo/azul)
-✅ Ícone de robô 🤖
-✅ Texto da análise IA
+✓ Compiled successfully in 14.0s
+✓ 17 routes compiled
 ```
 
 ---
 
-## 🔍 PONTOS CRÍTICOS PARA OBSERVAR
+## 🎯 ANTES DE TESTAR
 
-### ⏱️ Tempo de Resposta da IA
-**Esperado:** < 3 segundos  
-**Observar:** Quanto tempo leva do "Finalizar Teste" até aparecer o resultado?
+### ⚠️ EXECUTAR SQL NO SUPABASE (OBRIGATÓRIO)
 
-### 📝 Consistência do Texto Gerado
-**Esperado:** Análise coerente com as respostas  
-**Observar:** O texto da IA faz sentido? Está relacionado ao perfil?
+**Arquivo**: `supabase/fix-rls-policies.sql`
 
-### 🎨 Experiência Visual
-**Esperado:** Design roxo/azul para seção de IA  
-**Observar:** 
-- Seção de IA tem cor diferente?
-- Ícone de robô 🤖 aparece?
-- Design está bonito e profissional?
+**Passos**:
+1. Abrir [Supabase Dashboard](https://supabase.com/dashboard)
+2. Selecionar seu projeto
+3. Ir em **SQL Editor** (menu lateral)
+4. Clicar em **New Query**
+5. Copiar todo o conteúdo de `supabase/fix-rls-policies.sql`
+6. Colar no editor
+7. Clicar em **Run** (ou Ctrl+Enter)
+8. Verificar mensagem de sucesso: ✅ RLS Policies configured successfully!
 
-### 🚫 Sem Travamentos
-**Esperado:** Fluxo suave sem delays estranhos  
-**Observar:**
-- Páginas carregam rápido?
-- Sem loading infinito?
-- Sem erros no console (F12)?
+**Por que é necessário**:
+- Sem RLS policies, o INSERT em `disc_tests` vai falhar
+- Mesmo com sessão válida, Supabase bloqueia sem policies
+- É uma proteção de segurança do Supabase
 
 ---
 
-## ✅ CHECKLIST RÁPIDO
+## 🧪 FLUXO DE TESTE
 
-Durante o teste, marque:
+### Teste 1: Login e Sessão ✅
 
-- [ ] Login funcionou
-- [ ] Perfil foi salvo
-- [ ] Teste aceita 2 respostas por pergunta
-- [ ] Contador mostra X/2
-- [ ] Botão desabilita quando < 2 respostas
-- [ ] Outras opções desabilitam quando = 2 respostas
-- [ ] Teste foi finalizado e salvou
-- [ ] Resultado apareceu
-- [ ] **Análise IA apareceu** (seção roxa/azul)
-- [ ] Análise IA é coerente
-- [ ] Tempo de resposta foi aceitável (< 3s)
-- [ ] Sem erros no console (F12)
+1. **Fazer logout** (se estiver logado)
+   - Ir em `/login`
+   - Clicar em "Sair" (se houver)
+
+2. **Fazer login novamente**
+   - Email: seu email cadastrado
+   - Senha: sua senha
+   - Clicar em "Entrar"
+
+3. **Verificar no console do browser**:
+   ```
+   [Auth] User logged in: { userId: '...', email: '...' }
+   ```
+
+4. **Verificar cookies**:
+   - Abrir DevTools → Application → Cookies
+   - Procurar cookies do Supabase (sb-*)
+   - Devem existir e ter valores
 
 ---
 
-## 📊 RESULTADO DO TESTE
+### Teste 2: Completar Perfil ✅
 
-### ✅ Se TUDO funcionar:
+1. **Ir para `/profile`**
+   - Deve carregar sem redirecionar para login
+   - Se redirecionar: sessão não está funcionando
 
-**Me avise:**
+2. **Preencher dados**:
+   - Nome completo
+   - Cargo
+   - Empresa
+   - Objetivo do teste
+
+3. **Salvar perfil**
+   - Clicar em "Salvar"
+   - Verificar mensagem de sucesso
+
+---
+
+### Teste 3: Iniciar Teste DISC ✅
+
+1. **Ir para `/test`**
+   - Deve mostrar tela de seleção de perguntas
+   - Se redirecionar para login: middleware não está funcionando
+
+2. **Selecionar quantidade**:
+   - Escolher "20 perguntas" (mais rápido)
+   - Clicar em "Iniciar Teste"
+
+3. **Verificar no console**:
+   ```
+   [Test] Questions generated: { count: 20, source: 'bank' }
+   ```
+
+---
+
+### Teste 4: Responder Perguntas ✅
+
+1. **Responder cada pergunta**:
+   - Selecionar 1 ou 2 opções
+   - Clicar em "Próxima"
+   - Verificar progresso: "Pergunta 1 de 20" → "Pergunta 20 de 20"
+
+2. **Verificar contador**:
+   - Deve mostrar "1/2 selecionadas" ou "2/2 selecionadas"
+   - Botão "Próxima" só ativa com pelo menos 1 seleção
+
+---
+
+### Teste 5: Finalizar e Salvar ✅ (CRÍTICO)
+
+1. **Na última pergunta**:
+   - Responder normalmente
+   - Botão muda para "Finalizar Teste"
+   - Clicar em "Finalizar Teste"
+
+2. **Verificar logs no console**:
+   ```
+   [calculate-result] Request received: { userId: '...', answersCount: 20 }
+   [calculate-result] Checking authentication...
+   [calculate-result] Auth check result: { hasUser: true, userId: '...' }
+   [calculate-result] User authenticated: { userId: '...', email: '...' }
+   [calculate-result] Integrated profile calculated: { dominant: 'D' }
+   [Marina] { success: true, executionTime: '1234ms' }
+   [calculate-result] Test saved successfully
+   [Test] Result calculated successfully
+   ```
+
+3. **Resultado esperado**:
+   - ✅ Redireciona para `/result`
+   - ✅ Mostra análise DISC
+   - ✅ Mostra gráfico de perfil
+
+---
+
+## 🐛 SE DER ERRO
+
+### Erro 401: "Sessão expirada"
+
+**Sintoma**:
 ```
-"Funcionou! FASE 2 validada ✅"
+[Test] API error: { status: 401, statusText: 'Unauthorized' }
+Sessão expirada. Por favor, faça login novamente.
 ```
 
-**Então vamos para FASE 3:**
-1. 🤖 Chat IA melhorado
-2. 📄 Relatório PDF
-3. 📊 Dashboard admin completo
+**Solução**:
+1. Fazer logout
+2. Fazer login novamente
+3. Tentar novamente
+
+**Se persistir**:
+- Verificar se middleware está ativo (deve estar)
+- Verificar cookies no browser (DevTools → Application → Cookies)
+- Limpar cookies e fazer login novamente
 
 ---
 
-### ❌ Se ALGO não funcionar:
+### Erro 500: "Erro ao salvar teste"
 
-**Me avise:**
+**Sintoma**:
 ```
-"Problema: [descrever o que aconteceu]"
+[calculate-result] Error saving test: { message: 'new row violates row-level security policy' }
 ```
 
-**Exemplos:**
-- "Problema: Loading infinito ao finalizar teste"
-- "Problema: Análise IA não apareceu"
-- "Problema: Erro 500 ao salvar"
-- "Problema: Tempo de resposta muito lento (> 5s)"
+**Solução**:
+1. **Executar SQL de RLS policies** (ver seção "ANTES DE TESTAR")
+2. Tentar novamente
 
-**Vou corrigir imediatamente!**
+**Verificar se policies foram criadas**:
+```sql
+SELECT policyname FROM pg_policies WHERE tablename = 'disc_tests';
+```
+
+Deve retornar:
+- Users can insert their own tests
+- Users can view their own tests
+- Users can update their own tests
+- Users can delete their own tests
 
 ---
 
-## 🆘 PROBLEMAS COMUNS
+### Erro: "API error: {}"
 
-### Loading Infinito
-**Solução:**
-```bash
-# Limpar cache do navegador
-Ctrl + Shift + Delete → Limpar tudo
-
-# Fazer logout e login novamente
+**Sintoma**:
+```
+[Test] API error: {}
 ```
 
-### Análise IA Não Aparece
-**Verificar:**
-1. Console do navegador (F12) → Ver erros
-2. Verificar se API `/api/ai/calculate-result` foi chamada
-3. Verificar se campo `ai_analysis` foi salvo no Supabase
-
-### Erro 500
-**Verificar:**
-1. Supabase está configurado?
-2. Tabela `profiles` existe?
-3. Perfil do usuário existe?
+**Solução**:
+1. Abrir DevTools → Network
+2. Filtrar por "calculate-result"
+3. Clicar na request
+4. Ver "Response" tab
+5. Copiar erro completo
+6. Enviar para análise
 
 ---
 
-## 📋 RELATÓRIOS DISPONÍVEIS
+## 📊 LOGS ESPERADOS (SUCESSO)
 
-Se quiser mais detalhes:
-
-- 📄 `RELATORIO_TESTES_FASE_2.md` - Relatório completo dos testes
-- 📄 `RESUMO_FINAL_COMPLETO.md` - Resumo final da FASE 2
-- 📄 `STATUS_FASE_2.md` - Status atual do sistema
-
----
-
-## 🎯 RESUMO
-
+### Console do Browser:
 ```
-1. Abrir: http://localhost:3001
-2. Login → Perfil → Teste (2 respostas) → Resultado
-3. Observar: IA, tempo, visual, sem travamentos
-4. Avisar: "Funcionou" ou "Problema: [descrever]"
+[Test] Questions generated: { count: 20, source: 'bank' }
+[Test] Result calculated successfully
 ```
 
-**Simples assim! 🚀**
+### Console do Servidor (Terminal):
+```
+[calculate-result] Request received: { userId: '...', answersCount: 20 }
+[calculate-result] Checking authentication...
+[calculate-result] Auth check result: { hasUser: true, userId: '...' }
+[calculate-result] User authenticated: { userId: '...', email: '...' }
+[calculate-result] Extended answers: { count: 20 }
+[calculate-result] Integrated profile calculated: { hasDisc: true, dominant: 'D' }
+[Marina] { success: true, usedFallback: false, executionTime: '1234ms' }
+[calculate-result] Preparing to save test: { userId: '...', answersCount: 20 }
+[calculate-result] Test saved successfully
+```
 
 ---
 
-## 📊 TESTES AUTOMATIZADOS
+## ✅ CHECKLIST DE TESTE
 
-**Já executados e validados:**
-- ✅ 7/7 testes passaram (100%)
-- ✅ Todas as páginas funcionando
-- ✅ Todas as APIs configuradas
-- ✅ Todos os componentes implementados
-- ✅ Todas as funcionalidades presentes
-
-**Falta apenas:**
-- ⏳ Teste manual no navegador (VOCÊ)
+- [ ] SQL de RLS policies executado no Supabase
+- [ ] Logout e login novamente
+- [ ] Perfil completo
+- [ ] Teste iniciado (20 perguntas)
+- [ ] Todas as perguntas respondidas
+- [ ] Teste finalizado sem erro 401
+- [ ] Teste salvo sem erro 500
+- [ ] Redirecionado para `/result`
+- [ ] Resultado exibido corretamente
 
 ---
 
-**Bora testar! 🔥**
+## 🎯 PRÓXIMOS PASSOS APÓS SUCESSO
 
-**Abra:** http://localhost:3001
+1. **Testar com 40 perguntas**
+   - Verificar se IA é chamada ou se usa banco
+   - Verificar performance (deve ser < 3s)
 
-**Qualquer dúvida, é só perguntar! 💬**
+2. **Testar com 60 perguntas**
+   - Verificar se IA é chamada ou se usa banco
+   - Verificar performance (deve ser < 5s)
+
+3. **Verificar análise integrada**
+   - Deve incluir DISC + Valores + Tipos Psicológicos
+   - Deve ser personalizada com nome e cargo
+
+---
+
+## 📝 REPORTAR RESULTADOS
+
+Após testar, reportar:
+
+1. **Status de cada teste** (✅ ou ❌)
+2. **Logs do console** (browser e servidor)
+3. **Erros encontrados** (se houver)
+4. **Tempo de carregamento** (primeira pergunta e finalização)
+5. **Qualidade da análise** (faz sentido? está personalizada?)
+
+---
+
+**Boa sorte! 🚀**

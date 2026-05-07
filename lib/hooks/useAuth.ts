@@ -25,24 +25,46 @@ export function useAuth() {
   });
 
   useEffect(() => {
+    let isSubscribed = true;
+    let loadingInProgress = false;
+
     // Timeout de segurança para evitar loading infinito
     const timeout = setTimeout(() => {
-      console.warn('[useAuth] Loading timeout - forcing loading to false');
-      setState((prev) => ({ ...prev, loading: false }));
-    }, 10000); // 10 segundos
+      if (isSubscribed) {
+        console.warn('[useAuth] Loading timeout - forcing loading to false');
+        setState((prev) => ({ ...prev, loading: false }));
+      }
+    }, 8000); // 8 segundos
 
     // Carregar estado inicial
-    loadUserState().finally(() => {
-      clearTimeout(timeout);
-    });
+    const initAuth = async () => {
+      if (loadingInProgress) {
+        console.log('[useAuth] Load already in progress, skipping');
+        return;
+      }
+      
+      loadingInProgress = true;
+      
+      try {
+        await loadUserState();
+      } finally {
+        loadingInProgress = false;
+        clearTimeout(timeout);
+      }
+    };
 
-    // Escutar mudanças de autenticação
+    initAuth();
+
+    // Escutar APENAS logout - não precisamos escutar SIGNED_IN
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event);
-        if (event === 'SIGNED_IN' && session) {
-          await loadUserState();
-        } else if (event === 'SIGNED_OUT') {
+        if (!isSubscribed) return;
+        
+        console.log('[useAuth] Auth state changed:', event);
+        
+        // Ignorar todos os eventos exceto SIGNED_OUT
+        if (event === 'SIGNED_OUT') {
+          console.log('[useAuth] User signed out, clearing state');
           setState({
             user: null,
             profile: null,
@@ -52,11 +74,14 @@ export function useAuth() {
             latestTestResult: null,
             loading: false,
           });
+        } else {
+          console.log('[useAuth] Ignoring event:', event);
         }
       }
     );
 
     return () => {
+      isSubscribed = false;
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
@@ -92,18 +117,12 @@ export function useAuth() {
       const isAdmin = profile?.role === 'admin';
       const hasProfile = profile?.profile_completed || false;
 
-      // Buscar último teste (com tratamento de erro)
-      console.log('[useAuth] Fetching latest test...');
-      let latestTest = null;
-      try {
-        latestTest = await discTestService.getLatestTest(user.id);
-        console.log('[useAuth] Latest test:', latestTest ? 'Found' : 'Not found');
-      } catch (testError) {
-        console.error('[useAuth] Error fetching test (non-critical):', testError);
-        // Não bloquear o carregamento se houver erro ao buscar teste
-      }
+      // NÃO buscar teste aqui - deixar para as páginas específicas fazerem isso
+      // Isso evita lentidão no carregamento inicial
+      console.log('[useAuth] Skipping test fetch for performance');
       
-      const hasCompletedTest = !!latestTest;
+      const hasCompletedTest = false; // Será verificado pelas páginas específicas
+      const latestTest = null;
 
       console.log('[useAuth] State loaded successfully');
       setState({
@@ -122,6 +141,7 @@ export function useAuth() {
   };
 
   const refreshState = async () => {
+    console.log('[useAuth] Manual refresh requested');
     await loadUserState();
   };
 

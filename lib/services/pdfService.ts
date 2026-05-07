@@ -98,34 +98,51 @@ export class PDFService {
    * Gera PDF completo do resultado DISC
    */
   async generateReport(data: PDFData): Promise<Blob> {
-    // Página 1: Capa
-    this.addCoverPage(data);
+    try {
+      console.log('[PDFService] Starting report generation');
+      
+      // Página 1: Capa
+      console.log('[PDFService] Adding cover page');
+      this.addCoverPage(data);
 
-    // Página 2: Informações do Usuário
-    this.doc.addPage();
-    this.currentY = this.margin;
-    this.addUserInfo(data);
+      // Página 2: Informações do Usuário
+      console.log('[PDFService] Adding user info page');
+      this.doc.addPage();
+      this.currentY = this.margin;
+      this.addUserInfo(data);
 
-    // Página 3: Resultado DISC
-    this.doc.addPage();
-    this.currentY = this.margin;
-    this.addDISCResult(data);
+      // Página 3: Resultado DISC
+      console.log('[PDFService] Adding DISC result page');
+      this.doc.addPage();
+      this.currentY = this.margin;
+      this.addDISCResult(data);
 
-    // Página 4: Análise IA
-    this.doc.addPage();
-    this.currentY = this.margin;
-    this.addAIAnalysis(data);
+      // Página 4: Análise IA
+      console.log('[PDFService] Adding AI analysis page');
+      this.doc.addPage();
+      this.currentY = this.margin;
+      this.addAIAnalysis(data);
 
-    // Página 5: Recomendações
-    this.doc.addPage();
-    this.currentY = this.margin;
-    this.addRecommendations(data);
+      // Página 5: Recomendações
+      console.log('[PDFService] Adding recommendations page');
+      this.doc.addPage();
+      this.currentY = this.margin;
+      this.addRecommendations(data);
 
-    // Rodapé em todas as páginas
-    this.addFooters();
+      // Rodapé em todas as páginas
+      console.log('[PDFService] Adding footers');
+      this.addFooters();
 
-    // Retornar blob
-    return this.doc.output('blob');
+      // Retornar blob
+      console.log('[PDFService] Generating blob');
+      const blob = this.doc.output('blob');
+      console.log('[PDFService] Blob generated successfully:', { size: blob.size });
+      return blob;
+    } catch (error: any) {
+      console.error('[PDFService] Error generating report:', error);
+      console.error('[PDFService] Error stack:', error.stack);
+      throw new Error(`Falha ao gerar PDF: ${error.message}`);
+    }
   }
 
   /**
@@ -172,7 +189,8 @@ export class PDFService {
 
     // Perfil dominante
     const profile = profileDescriptions[data.dominantProfile];
-    this.doc.setFillColor(...profile.color);
+    const [r, g, b] = profile.color;
+    this.doc.setFillColor(r, g, b);
     this.doc.roundedRect(centerX - 60, 240, 120, 30, 5, 5, 'F');
     this.doc.setTextColor(255, 255, 255);
     this.doc.setFontSize(18);
@@ -246,7 +264,8 @@ export class PDFService {
 
     // Perfil dominante
     const profile = profileDescriptions[data.dominantProfile];
-    this.doc.setFillColor(...profile.color);
+    const [r, g, b] = profile.color;
+    this.doc.setFillColor(r, g, b);
     this.doc.roundedRect(this.margin, this.currentY, this.pageWidth - 2 * this.margin, 40, 5, 5, 'F');
     
     this.doc.setTextColor(255, 255, 255);
@@ -286,7 +305,8 @@ export class PDFService {
       this.doc.setFillColor(220, 220, 220);
       this.doc.roundedRect(this.margin + 50, y, maxBarWidth, barHeight, 3, 3, 'F');
       
-      this.doc.setFillColor(...profile.color);
+      const [r, g, b] = profile.color;
+      this.doc.setFillColor(r, g, b);
       this.doc.roundedRect(this.margin + 50, y, barWidth, barHeight, 3, 3, 'F');
 
       // Score
@@ -505,18 +525,37 @@ export class PDFService {
 
 // Função helper para gerar PDF
 export async function generateDISCReport(data: PDFData): Promise<Blob> {
-  const pdfService = new PDFService();
-  return await pdfService.generateReport(data);
+  try {
+    console.log('[generateDISCReport] Creating PDFService instance');
+    const pdfService = new PDFService();
+    console.log('[generateDISCReport] Calling generateReport');
+    const blob = await pdfService.generateReport(data);
+    console.log('[generateDISCReport] Report generated successfully');
+    return blob;
+  } catch (error: any) {
+    console.error('[generateDISCReport] Error:', error);
+    throw error;
+  }
 }
 
 // Função helper para download
 export function downloadPDF(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  try {
+    console.log('[downloadPDF] Creating object URL');
+    const url = URL.createObjectURL(blob);
+    console.log('[downloadPDF] Creating download link');
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    console.log('[downloadPDF] Triggering download');
+    link.click();
+    console.log('[downloadPDF] Cleaning up');
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    console.log('[downloadPDF] Download completed successfully');
+  } catch (error: any) {
+    console.error('[downloadPDF] Error:', error);
+    throw new Error(`Falha ao fazer download do PDF: ${error.message}`);
+  }
 }

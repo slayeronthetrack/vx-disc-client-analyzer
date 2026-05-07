@@ -95,7 +95,16 @@ export default function DashboardPage() {
 
       if (testsError) throw testsError;
 
-      setTests(testsData as TestRecord[] || []);
+      // Transform data to match TestRecord type
+      const transformedTests: TestRecord[] = (testsData || []).map(test => ({
+        id: test.id,
+        user_id: test.user_id,
+        dominant_profile: test.dominant_profile,
+        created_at: test.created_at,
+        profiles: Array.isArray(test.profiles) ? test.profiles[0] : test.profiles,
+      }));
+
+      setTests(transformedTests);
 
       // Calcular métricas
       const totalTests = testsData?.length || 0;
