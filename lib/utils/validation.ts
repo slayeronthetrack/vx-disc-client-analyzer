@@ -105,7 +105,7 @@ export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = schema.safeParse(data);
   
   if (!result.success) {
-    const errors = result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+    const errors = result.error.issues.map(err => `${err.path.join('.')}: ${err.message}`);
     throw new Error(`Validation failed: ${errors.join(', ')}`);
   }
   

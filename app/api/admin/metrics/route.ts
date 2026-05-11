@@ -61,6 +61,49 @@ export async function GET() {
 
     const companiesNearLimit = stats?.length || 0;
 
+    // Get DISC distribution
+    const { data: discTests } = await supabase
+      .from('company_tests')
+      .select('disc_result')
+      .eq('status', 'COMPLETED')
+      .not('disc_result', 'is', null);
+
+    const discCounts = { D: 0, I: 0, S: 0, C: 0 };
+    discTests?.forEach((test: any) => {
+      const dominant = test.disc_result?.dominant;
+      if (dominant && dominant in discCounts) {
+        discCounts[dominant as keyof typeof discCounts]++;
+      }
+    });
+
+    const disc_distribution = [
+      { name: 'Dominância', value: discCounts.D, color: '#ef4444' },
+      { name: 'Influência', value: discCounts.I, color: '#f59e0b' },
+      { name: 'Estabilidade', value: discCounts.S, color: '#10b981' },
+      { name: 'Conformidade', value: discCounts.C, color: '#3b82f6' },
+    ].filter(item => item.value > 0);
+
+    // Get monthly growth (last 6 months)
+    const monthlyGrowth = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+
+      const { count } = await supabase
+        .from('company_tests')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString());
+
+      const monthName = monthStart.toLocaleDateString('pt-BR', { month: 'short' });
+      monthlyGrowth.push({
+        month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+        tests: count || 0,
+      });
+    }
+
     return NextResponse.json({
       total_companies: totalCompanies || 0,
       active_companies: activeCompanies || 0,
@@ -68,6 +111,8 @@ export async function GET() {
       tests_this_month: testsThisMonth || 0,
       completion_rate: completionRate,
       companies_near_limit: companiesNearLimit,
+      disc_distribution,
+      monthly_growth: monthlyGrowth,
     });
   } catch (error) {
     console.error('Error fetching admin metrics:', error);

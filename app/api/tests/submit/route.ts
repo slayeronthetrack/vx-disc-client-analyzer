@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { submitTest } from '@/lib/services/companyTestService';
 import { validateData, submitTestSchema } from '@/lib/utils/validation';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/tests/submit
@@ -17,8 +18,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = validateData(submitTestSchema, body);
 
+    // Create Supabase client
+    const supabase = await createClient();
+
     // Submit test
-    const test = await submitTest(validatedData);
+    const test = await submitTest(validatedData, supabase);
 
     return NextResponse.json(test, { status: 201 });
   } catch (error) {

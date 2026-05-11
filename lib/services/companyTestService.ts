@@ -14,7 +14,8 @@ import type {
   CompanyTestListResponse,
   DISCResult,
 } from '@/types/company-test';
-import type { ExtendedAnswer, DISCType } from '@/types/integrated-profile';
+import type { ExtendedAnswer } from '@/types/integrated-profile';
+import type { DISCType } from '@/types/database';
 import { v5 as uuidv5 } from 'uuid';
 
 // Namespace UUID for generating employee IDs

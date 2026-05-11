@@ -15,8 +15,26 @@ import {
   AlertCircle,
   Plus,
   ArrowRight,
-  Activity
+  Activity,
+  Trophy,
+  Medal,
+  Award
 } from 'lucide-react';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Legend, 
+  Tooltip,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar
+} from 'recharts';
 
 interface GlobalMetrics {
   total_companies: number;
@@ -25,6 +43,8 @@ interface GlobalMetrics {
   tests_this_month: number;
   completion_rate: number;
   companies_near_limit: number;
+  disc_distribution?: Array<{ name: string; value: number; color: string }>;
+  monthly_growth?: Array<{ month: string; tests: number }>;
 }
 
 interface TopCompany {
@@ -48,6 +68,14 @@ export default function AdminDashboardPage() {
   const [topCompanies, setTopCompanies] = useState<TopCompany[]>([]);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Get ranking badge for top 3 companies
+  const getRankingBadge = (index: number) => {
+    if (index === 0) return { icon: Trophy, color: 'text-yellow-400', bg: 'bg-yellow-400/10' };
+    if (index === 1) return { icon: Medal, color: 'text-gray-300', bg: 'bg-gray-300/10' };
+    if (index === 2) return { icon: Award, color: 'text-orange-400', bg: 'bg-orange-400/10' };
+    return null;
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -203,6 +231,80 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* DISC Distribution Chart */}
+        {metrics?.disc_distribution && metrics.disc_distribution.length > 0 && (
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Distribuição DISC</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={metrics.disc_distribution}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {metrics.disc_distribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1f2937', 
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Legend 
+                  wrapperStyle={{ color: '#9ca3af' }}
+                  iconType="circle"
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Monthly Growth Chart */}
+        {metrics?.monthly_growth && metrics.monthly_growth.length > 0 && (
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Crescimento Mensal</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={metrics.monthly_growth}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="#9ca3af"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="#9ca3af"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1f2937', 
+                    border: '1px solid #374151',
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="tests" 
+                  stroke="#f97316" 
+                  strokeWidth={3}
+                  dot={{ fill: '#f97316', r: 5 }}
+                  activeDot={{ r: 7 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
         {/* Top 10 Companies */}
         <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
@@ -221,29 +323,40 @@ export default function AdminDashboardPage() {
                 Nenhuma empresa cadastrada ainda
               </p>
             ) : (
-              topCompanies.map((company, index) => (
-                <Link
-                  key={company.id}
-                  href={`/admin/companies/${company.id}`}
-                  className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg hover:bg-gray-900/70 transition-colors group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 font-bold">
-                      {index + 1}
+              topCompanies.map((company, index) => {
+                const rankBadge = getRankingBadge(index);
+                const RankIcon = rankBadge?.icon;
+                
+                return (
+                  <Link
+                    key={company.id}
+                    href={`/admin/companies/${company.id}`}
+                    className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg hover:bg-gray-900/70 transition-all hover:scale-[1.02] group"
+                  >
+                    <div className="flex items-center gap-4">
+                      {rankBadge && RankIcon ? (
+                        <div className={`w-10 h-10 rounded-full ${rankBadge.bg} flex items-center justify-center`}>
+                          <RankIcon className={rankBadge.color} size={20} />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 font-bold">
+                          {index + 1}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-white font-medium group-hover:text-orange-500 transition-colors">
+                          {company.name}
+                        </p>
+                        <p className="text-gray-400 text-sm">/{company.slug}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-white font-medium group-hover:text-orange-500 transition-colors">
-                        {company.name}
-                      </p>
-                      <p className="text-gray-400 text-sm">/{company.slug}</p>
+                    <div className="text-right">
+                      <p className="text-white font-bold text-lg">{company.total_tests}</p>
+                      <p className="text-gray-400 text-sm">testes</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white font-bold">{company.total_tests}</p>
-                    <p className="text-gray-400 text-sm">testes</p>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>
