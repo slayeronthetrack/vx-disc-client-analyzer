@@ -12,21 +12,30 @@ import Link from 'next/link';
 import { CompanyForm } from '@/components/admin/companies/CompanyForm';
 import type { Company, UpdateCompanyInput } from '@/types/company';
 
-export default function EditCompanyPage({ params }: { params: { id: string } }) {
+export default function EditCompanyPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [company, setCompany] = useState<Company | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Unwrap params Promise
   useEffect(() => {
+    params.then(p => setCompanyId(p.id));
+  }, [params]);
+
+  useEffect(() => {
+    if (!companyId) return;
     loadCompany();
-  }, [params.id]);
+  }, [companyId]);
 
   const loadCompany = async () => {
+    if (!companyId) return;
+    
     try {
       setLoading(true);
       const { apiGet } = await import('@/lib/utils/apiClient');
 
-      const response = await apiGet(`/api/companies/${params.id}`);
+      const response = await apiGet(`/api/companies/${companyId}`);
       
       if (!response.ok) {
         throw new Error('Empresa não encontrada');
@@ -44,9 +53,11 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
   };
 
   const handleSubmit = async (data: UpdateCompanyInput) => {
+    if (!companyId) return;
+    
     try {
       const { apiPatch } = await import('@/lib/utils/apiClient');
-      const response = await apiPatch(`/api/companies/${params.id}`, data);
+      const response = await apiPatch(`/api/companies/${companyId}`, data);
 
       if (!response.ok) {
         const error = await response.json();
@@ -57,7 +68,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
       alert('Empresa atualizada com sucesso!');
       
       // Redirect to company detail page
-      router.push(`/admin/companies/${params.id}`);
+      router.push(`/admin/companies/${companyId}`);
     } catch (error) {
       console.error('Error updating company:', error);
       throw error;
@@ -65,7 +76,8 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
   };
 
   const handleCancel = () => {
-    router.push(`/admin/companies/${params.id}`);
+    if (!companyId) return;
+    router.push(`/admin/companies/${companyId}`);
   };
 
   if (loading) {
@@ -79,7 +91,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
     );
   }
 
-  if (!company) {
+  if (!company || !companyId) {
     return null;
   }
 
@@ -88,7 +100,7 @@ export default function EditCompanyPage({ params }: { params: { id: string } }) 
       {/* Header */}
       <div className="mb-8">
         <Link
-          href={`/admin/companies/${params.id}`}
+          href={`/admin/companies/${companyId}`}
           className="inline-flex items-center gap-2 text-gray-400 hover:text-orange-500 transition-colors mb-4"
         >
           <ArrowLeft size={20} />

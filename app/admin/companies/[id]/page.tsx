@@ -27,9 +27,10 @@ import { EmployeeTable } from '@/components/admin/employees/EmployeeTable';
 import { EmployeeModal } from '@/components/admin/employees/EmployeeModal';
 import DISCPieChart from '@/components/ui/DISCPieChart';
 
-export default function CompanyDetailPage({ params }: { params: { id: string } }) {
+export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [company, setCompany] = useState<Company | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [stats, setStats] = useState<CompanyStats | null>(null);
   const [tests, setTests] = useState<CompanyTest[]>([]);
   const [selectedTest, setSelectedTest] = useState<CompanyTest | null>(null);
@@ -37,18 +38,26 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
   const [loading, setLoading] = useState(true);
   const [loadingTests, setLoadingTests] = useState(true);
 
+  // Unwrap params Promise
   useEffect(() => {
+    params.then(p => setCompanyId(p.id));
+  }, [params]);
+
+  useEffect(() => {
+    if (!companyId) return;
     loadCompanyData();
     loadCompanyTests();
-  }, [params.id]);
+  }, [companyId]);
 
   const loadCompanyData = async () => {
+    if (!companyId) return;
+    
     try {
       setLoading(true);
       const { apiGet } = await import('@/lib/utils/apiClient');
 
       // Load company
-      const companyResponse = await apiGet(`/api/companies/${params.id}`);
+      const companyResponse = await apiGet(`/api/companies/${companyId}`);
       if (!companyResponse.ok) {
         throw new Error('Empresa não encontrada');
       }
@@ -56,7 +65,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
       setCompany(companyData);
 
       // Load stats
-      const statsResponse = await apiGet(`/api/companies/${params.id}/stats`);
+      const statsResponse = await apiGet(`/api/companies/${companyId}/stats`);
       if (statsResponse.ok) {
         const statsData = await statsResponse.json();
         setStats(statsData);
@@ -71,13 +80,15 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
   };
 
   const loadCompanyTests = async () => {
+    if (!companyId) return;
+    
     try {
       setLoadingTests(true);
       const { apiGet } = await import('@/lib/utils/apiClient');
 
       // Load tests with default filters (all completed tests)
       const testsResponse = await apiGet(
-        `/api/companies/${params.id}/tests?status=COMPLETED&sortBy=created_at&sortOrder=desc&limit=1000`
+        `/api/companies/${companyId}/tests?status=COMPLETED&sortBy=created_at&sortOrder=desc&limit=1000`
       );
       
       if (testsResponse.ok) {
@@ -93,7 +104,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
   };
 
   const handleDelete = async () => {
-    if (!company) return;
+    if (!company || !companyId) return;
 
     if (!confirm(`Tem certeza que deseja deletar a empresa "${company.name}"? Esta ação não pode ser desfeita.`)) {
       return;
@@ -101,7 +112,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
 
     try {
       const { apiDelete } = await import('@/lib/utils/apiClient');
-      const response = await apiDelete(`/api/companies/${params.id}`);
+      const response = await apiDelete(`/api/companies/${companyId}`);
 
       if (response.ok) {
         alert('Empresa deletada com sucesso!');
@@ -168,7 +179,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
     );
   }
 
-  if (!company) {
+  if (!company || !companyId) {
     return null;
   }
 
@@ -219,7 +230,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
 
             <div className="flex items-center gap-2">
               <Link
-                href={`/admin/companies/${company.id}/edit`}
+                href={`/admin/companies/${companyId}/edit`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-lg hover:bg-orange-500/20 transition-colors"
               >
                 <Edit size={16} />
@@ -317,7 +328,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
         </div>
       )}
 
-      {/* Employee List Placeholder */}
+      {/* Employee List */}
       <div>
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-white mb-2">Funcionários</h2>
@@ -348,7 +359,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
           </div>
         ) : (
           <EmployeeTable
-            companyId={params.id}
+            companyId={companyId}
             tests={tests}
             onViewDetails={handleViewDetails}
           />
