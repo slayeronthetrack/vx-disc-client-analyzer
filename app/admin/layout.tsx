@@ -149,7 +149,7 @@ export default function AdminLayout({
               >
                 <Icon size={20} />
                 <span>{item.label}</span>
-                {'superAdminOnly' in item && item.superAdminOnly && (
+                {('superAdminOnly' in item && (item as any).superAdminOnly) && (
                   <Shield size={14} className="ml-auto" />
                 )}
               </Link>
