@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { startTest } from '@/lib/services/companyTestService';
 import { validateData, startTestSchema } from '@/lib/utils/validation';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/tests/start
@@ -18,7 +19,8 @@ export async function POST(request: NextRequest) {
     const validatedData = validateData(startTestSchema, body);
 
     // Check if test can be started
-    const result = await startTest(validatedData);
+    const supabase = await createClient();
+    const result = await startTest(validatedData, supabase);
 
     if (!result.canStart) {
       return NextResponse.json(

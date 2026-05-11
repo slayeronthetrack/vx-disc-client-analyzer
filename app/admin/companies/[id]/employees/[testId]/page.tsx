@@ -73,6 +73,14 @@ export default function EmployeeDetailPage({
     }
   };
 
+  const handleExportPDF = () => {
+    if (!test || !company) return;
+    
+    import('@/lib/utils/reportGenerator').then(({ generateEmployeePDF }) => {
+      generateEmployeePDF(test, company);
+    });
+  };
+
   const getProfileColor = (profile: string) => {
     const colors = {
       D: { bg: 'bg-red-500', text: 'text-red-500', border: 'border-red-500' },
@@ -169,6 +177,7 @@ export default function EmployeeDetailPage({
           </div>
           
           <button
+            onClick={handleExportPDF}
             className="inline-flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold"
           >
             <Download size={20} />

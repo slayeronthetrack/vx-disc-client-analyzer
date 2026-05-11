@@ -78,6 +78,41 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ id:
     return matchesSearch && matchesProfile;
   });
 
+  const handleExportCSV = () => {
+    if (!company || filteredTests.length === 0) return;
+    
+    import('@/lib/utils/reportGenerator').then(({ generateEmployeesCSV }) => {
+      generateEmployeesCSV(filteredTests, company);
+    });
+  };
+
+  const handleExportCompanyReport = async () => {
+    if (!company || tests.length === 0) return;
+    
+    try {
+      const { apiGet } = await import('@/lib/utils/apiClient');
+      const statsResponse = await apiGet(`/api/companies/${companyId}/stats`);
+      
+      if (statsResponse.ok) {
+        const stats = await statsResponse.json();
+        
+        import('@/lib/utils/reportGenerator').then(({ generateCompanyReportPDF }) => {
+          generateCompanyReportPDF(company, tests, {
+            total_tests: stats.total_tests || tests.length,
+            predominant_profile: stats.predominant_profile || '',
+            avg_d: stats.disc_averages?.avg_d || 0,
+            avg_i: stats.disc_averages?.avg_i || 0,
+            avg_s: stats.disc_averages?.avg_s || 0,
+            avg_c: stats.disc_averages?.avg_c || 0,
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error generating company report:', error);
+      alert('Erro ao gerar relatório consolidado');
+    }
+  };
+
   const getProfileColor = (profile: string) => {
     const colors = {
       D: 'text-red-500 bg-red-500/10 border-red-500/30',
@@ -130,6 +165,22 @@ export default function CompanyEmployeesPage({ params }: { params: Promise<{ id:
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportCSV}
+              disabled={filteredTests.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={20} />
+              Exportar CSV
+            </button>
+            <button
+              onClick={handleExportCompanyReport}
+              disabled={tests.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={20} />
+              Relatório Consolidado
+            </button>
             <Link
               href={`/test/${company.slug}`}
               target="_blank"
