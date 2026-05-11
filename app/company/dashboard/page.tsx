@@ -5,15 +5,68 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Loading } from '@/components/ui/Loading';
+import { OverviewCards } from '@/components/company/OverviewCards';
+import { DISCDistributionChart } from '@/components/company/DISCDistributionChart';
+import { FilterComponent } from '@/components/company/FilterComponent';
+import { EmployeeTable } from '@/components/company/EmployeeTable';
+import type { CompanyTest } from '@/types/company-test';
+
+interface DashboardStats {
+  totalTests: number;
+  uniqueEmployees: number;
+  averageScores: {
+    D: number;
+    I: number;
+    S: number;
+    C: number;
+  };
+  completionRate: number;
+  testsThisMonth: number;
+  discDistribution: {
+    D: { count: number; percentage: number };
+    I: { count: number; percentage: number };
+    S: { count: number; percentage: number };
+    C: { count: number; percentage: number };
+  };
+}
+
+interface TestsResponse {
+  tests: CompanyTest[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 export default function CompanyDashboardPage() {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Employee list state
+  const [tests, setTests] = useState<CompanyTest[]>([]);
+  const [testsLoading, setTestsLoading] = useState(true);
+  const [testsTotal, setTestsTotal] = useState(0);
+  const [testsPage, setTestsPage] = useState(1);
+  const [testsLimit] = useState(20);
+  const [testsTotalPages, setTestsTotalPages] = useState(0);
+  const [departments, setDepartments] = useState<string[]>([]);
+
+  // Filter state
+  const [filters, setFilters] = useState({
+    search: '',
+    dominant_profile: 'all',
+    department: 'all',
+  });
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     setMounted(true);
@@ -29,6 +82,94 @@ export default function CompanyDashboardPage() {
       router.push('/dashboard');
     }
   }, [user, loading, profile, router]);
+
+  // Fetch dashboard stats
+  useEffect(() => {
+    if (!user || profile?.role !== 'company_admin') return;
+
+    const fetchStats = async () => {
+      try {
+        setStatsLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/company/dashboard/stats');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard stats');
+        }
+
+        const data = await response.json();
+        setStats(data);
+      } catch (err) {
+        console.error('Error fetching stats:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [user, profile]);
+
+  // Fetch employee tests
+  const fetchTests = useCallback(async () => {
+    if (!user || profile?.role !== 'company_admin') return;
+
+    try {
+      setTestsLoading(true);
+
+      // Build query params
+      const params = new URLSearchParams({
+        page: testsPage.toString(),
+        limit: testsLimit.toString(),
+        sortBy,
+        sortOrder,
+      });
+
+      if (filters.search) params.append('search', filters.search);
+      if (filters.dominant_profile !== 'all') params.append('dominant_profile', filters.dominant_profile);
+      if (filters.department !== 'all') params.append('department', filters.department);
+
+      const response = await fetch(`/api/company/dashboard/tests?${params}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch employee tests');
+      }
+
+      const data: TestsResponse = await response.json();
+      setTests(data.tests);
+      setTestsTotal(data.total);
+      setTestsTotalPages(data.totalPages);
+
+      // Extract unique departments
+      const uniqueDepts = Array.from(
+        new Set(data.tests.map(t => t.department).filter(Boolean))
+      ) as string[];
+      setDepartments(uniqueDepts);
+    } catch (err) {
+      console.error('Error fetching tests:', err);
+    } finally {
+      setTestsLoading(false);
+    }
+  }, [user, profile, testsPage, testsLimit, sortBy, sortOrder, filters]);
+
+  useEffect(() => {
+    fetchTests();
+  }, [fetchTests]);
+
+  const handleFilterChange = useCallback((newFilters: typeof filters) => {
+    setFilters(newFilters);
+    setTestsPage(1); // Reset to first page when filters change
+  }, []);
+
+  const handlePageChange = useCallback((page: number) => {
+    setTestsPage(page);
+  }, []);
+
+  const handleSortChange = useCallback((newSortBy: string, newSortOrder: 'asc' | 'desc') => {
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder);
+  }, []);
 
   if (!mounted || loading) {
     return <Loading />;
@@ -51,14 +192,47 @@ export default function CompanyDashboardPage() {
           </p>
         </div>
 
-        {/* Placeholder content - will be replaced with actual components */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-400">
-            Dashboard em construção...
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Estatísticas, gráficos e lista de funcionários serão exibidos aqui.
-          </p>
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+            <p className="text-red-500">{error}</p>
+          </div>
+        )}
+
+        {/* Overview Cards */}
+        <div className="mb-8">
+          <OverviewCards stats={stats} loading={statsLoading} />
+        </div>
+
+        {/* DISC Distribution Chart */}
+        <div className="mb-8">
+          <DISCDistributionChart 
+            distribution={stats?.discDistribution || null} 
+            loading={statsLoading} 
+          />
+        </div>
+
+        {/* Employee List Placeholder */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white">Lista de Funcionários</h3>
+          
+          {/* Filters */}
+          <FilterComponent 
+            onFilterChange={handleFilterChange}
+            departments={departments}
+          />
+
+          {/* Employee Table */}
+          <EmployeeTable
+            tests={tests}
+            total={testsTotal}
+            page={testsPage}
+            limit={testsLimit}
+            totalPages={testsTotalPages}
+            onPageChange={handlePageChange}
+            onSortChange={handleSortChange}
+            loading={testsLoading}
+          />
         </div>
       </div>
     </div>
