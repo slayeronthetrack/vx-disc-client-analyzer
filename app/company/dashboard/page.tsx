@@ -84,33 +84,10 @@ export default function CompanyDashboardPage() {
     }
   }, [user, loading, profile, router]);
 
-  // Fetch dashboard stats
+  // Fetch dashboard stats on mount
   useEffect(() => {
-    if (!user || profile?.role !== 'company_admin') return;
-
-    const fetchStats = async () => {
-      try {
-        setStatsLoading(true);
-        setError(null);
-
-        const response = await fetch('/api/company/dashboard/stats');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard stats');
-        }
-
-        const data = await response.json();
-        setStats(data);
-      } catch (err) {
-        console.error('Error fetching stats:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-
     fetchStats();
-  }, [user, profile]);
+  }, [fetchStats]);
 
   // Fetch employee tests
   const fetchTests = useCallback(async () => {
@@ -157,6 +134,126 @@ export default function CompanyDashboardPage() {
   useEffect(() => {
     fetchTests();
   }, [fetchTests]);
+
+  // Real-time updates with Supabase
+  useEffect(() => {
+    if (!user || profile?.role !== 'company_admin' || !profile.company_id) return;
+
+    // Import Supabase client
+    const setupRealtimeSubscription = async () => {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+
+      // Subscribe to INSERT events on company_tests table
+      const channel = supabase
+        .channel('company_tests_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'company_tests',
+            filter: `company_id=eq.${profile.company_id}`,
+          },
+          (payload) => {
+            console.log('New test completed:', payload);
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4 shadow-lg z-50 animate-slide-in';
+            notification.innerHTML = `
+              <div class="flex items-center gap-3">
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <p class="text-green-500 font-medium">Novo teste concluído!</p>
+              </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 5 seconds
+            setTimeout(() => {
+              notification.remove();
+            }, 5000);
+
+            // Refresh stats and tests
+            fetchStats();
+            fetchTests();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
+    const cleanup = setupRealtimeSubscription();
+
+    return () => {
+      cleanup.then(fn => fn?.());
+    };
+  }, [user, profile, fetchTests]);
+
+  // Polling fallback (every 30 seconds when page is visible)
+  useEffect(() => {
+    if (!user || profile?.role !== 'company_admin') return;
+
+    let intervalId: NodeJS.Timeout;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Start polling when page becomes visible
+        intervalId = setInterval(() => {
+          fetchStats();
+          fetchTests();
+        }, 30000); // 30 seconds
+      } else {
+        // Stop polling when page is hidden
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      }
+    };
+
+    // Initial setup
+    if (document.visibilityState === 'visible') {
+      intervalId = setInterval(() => {
+        fetchStats();
+        fetchTests();
+      }, 30000);
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, profile, fetchStats, fetchTests]);
+
+  const fetchStats = useCallback(async () => {
+    if (!user || profile?.role !== 'company_admin') return;
+
+    try {
+      setStatsLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/company/dashboard/stats');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats');
+      }
+
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [user, profile]);
 
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
