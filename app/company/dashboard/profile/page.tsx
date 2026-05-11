@@ -9,11 +9,16 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Loading } from '@/components/ui/Loading';
+import { CompanyProfileForm } from '@/components/company/CompanyProfileForm';
+import type { Company } from '@/types/company';
 
 export default function CompanyProfilePage() {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [companyLoading, setCompanyLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -30,12 +35,87 @@ export default function CompanyProfilePage() {
     }
   }, [user, loading, profile, router]);
 
+  // Fetch company data
+  useEffect(() => {
+    if (!user || profile?.role !== 'company_admin' || !profile.company_id) return;
+
+    const fetchCompany = async () => {
+      try {
+        setCompanyLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/companies/${profile.company_id}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch company data');
+        }
+
+        const data = await response.json();
+        setCompany(data);
+      } catch (err) {
+        console.error('Error fetching company:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load company data');
+      } finally {
+        setCompanyLoading(false);
+      }
+    };
+
+    fetchCompany();
+  }, [user, profile]);
+
+  const handleUpdate = async (data: Partial<Company>) => {
+    if (!profile?.company_id) {
+      throw new Error('Company ID not found');
+    }
+
+    const response = await fetch('/api/company/dashboard/profile', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update profile');
+    }
+
+    const result = await response.json();
+    setCompany(result.company);
+  };
+
   if (!mounted || loading) {
     return <Loading />;
   }
 
   if (!user || profile?.role !== 'company_admin') {
     return null;
+  }
+
+  if (companyLoading) {
+    return (
+      <div className="p-6 lg:p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-700 rounded w-64" />
+            <div className="h-96 bg-gray-700 rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !company) {
+    return (
+      <div className="p-6 lg:p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 text-center">
+            <p className="text-red-500">{error || 'Empresa não encontrada'}</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -51,15 +131,8 @@ export default function CompanyProfilePage() {
           </p>
         </div>
 
-        {/* Placeholder content - will be replaced with actual form */}
-        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-400">
-            Formulário de perfil em construção...
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Você poderá editar informações de contato e endereço aqui.
-          </p>
-        </div>
+        {/* Company Profile Form */}
+        <CompanyProfileForm company={company} onUpdate={handleUpdate} />
       </div>
     </div>
   );
