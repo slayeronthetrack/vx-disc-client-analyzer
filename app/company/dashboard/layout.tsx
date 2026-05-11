@@ -16,7 +16,8 @@ import {
   LogOut,
   Menu,
   X,
-  Briefcase
+  Briefcase,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Loading } from '@/components/ui/Loading';
@@ -47,6 +48,11 @@ export default function CompanyDashboardLayout({
       label: 'Funcionários', 
       icon: Users, 
       href: '/company/dashboard/employees' 
+    },
+    { 
+      label: 'Convites', 
+      icon: Mail, 
+      href: '/company/dashboard/invitations' 
     },
     { 
       label: 'Perfil da Empresa', 
