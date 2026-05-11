@@ -114,7 +114,8 @@ export function useAuth() {
       const profile = await profileService.getProfile(user.id);
       console.log('[useAuth] Profile:', profile ? 'Found' : 'Not found');
       
-      const isAdmin = profile?.role === 'admin';
+      // Aceitar admin, super_admin, company_admin como admin
+      const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'company_admin';
       const hasProfile = profile?.profile_completed || false;
 
       // NÃO buscar teste aqui - deixar para as páginas específicas fazerem isso
@@ -169,11 +170,29 @@ export function useAuth() {
     return true;
   };
 
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setState({
+        user: null,
+        profile: null,
+        isAdmin: false,
+        hasProfile: false,
+        hasCompletedTest: false,
+        latestTestResult: null,
+        loading: false,
+      });
+    } catch (error) {
+      console.error('[useAuth] Error signing out:', error);
+    }
+  };
+
   return {
     ...state,
     refreshState,
     requireAuth,
     requireProfile,
     requireAdmin,
+    signOut,
   };
 }

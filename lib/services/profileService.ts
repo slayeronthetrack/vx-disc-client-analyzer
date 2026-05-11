@@ -75,9 +75,10 @@ export const profileService = {
 
   /**
    * Verificar se usuário é admin
+   * Aceita: admin, super_admin, company_admin
    */
   async isAdmin(userId: string): Promise<boolean> {
     const profile = await this.getProfile(userId);
-    return profile?.role === 'admin';
+    return profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'company_admin';
   },
 };
