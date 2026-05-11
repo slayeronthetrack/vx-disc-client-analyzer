@@ -17,40 +17,13 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Loading } from '@/components/ui/Loading';
 import { Logo } from '@/components/ui/Logo';
 import { useState } from 'react';
-
-const navItems = [
-  { 
-    label: 'Dashboard', 
-    icon: LayoutDashboard, 
-    href: '/admin' 
-  },
-  { 
-    label: 'Empresas', 
-    icon: Building2, 
-    href: '/admin/companies' 
-  },
-  { 
-    label: 'Funcionários', 
-    icon: Users, 
-    href: '/admin/employees' 
-  },
-  { 
-    label: 'Analytics', 
-    icon: BarChart3, 
-    href: '/admin/analytics' 
-  },
-  { 
-    label: 'Configurações', 
-    icon: Settings, 
-    href: '/admin/settings' 
-  },
-];
 
 export default function AdminLayout({
   children,
@@ -59,8 +32,50 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Check if user is super_admin
+  const isSuperAdmin = profile?.role === 'super_admin';
+
+  // Base nav items for all admins
+  const baseNavItems = [
+    { 
+      label: 'Dashboard', 
+      icon: LayoutDashboard, 
+      href: '/admin' 
+    },
+    { 
+      label: 'Empresas', 
+      icon: Building2, 
+      href: '/admin/companies' 
+    },
+    { 
+      label: 'Analytics', 
+      icon: BarChart3, 
+      href: '/admin/analytics' 
+    },
+    { 
+      label: 'Configurações', 
+      icon: Settings, 
+      href: '/admin/settings' 
+    },
+  ];
+
+  // Super admin exclusive items
+  const superAdminItems = [
+    { 
+      label: 'Admins', 
+      icon: Shield, 
+      href: '/admin/admins',
+      superAdminOnly: true
+    },
+  ];
+
+  // Combine nav items based on role
+  const navItems = isSuperAdmin 
+    ? [...baseNavItems.slice(0, 2), ...superAdminItems, ...baseNavItems.slice(2)]
+    : baseNavItems;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -102,7 +117,15 @@ export default function AdminLayout({
       >
         <div className="p-6 border-b border-gray-700">
           <Logo />
-          <p className="text-sm text-gray-400 mt-2">Admin Panel</p>
+          <div className="mt-2">
+            <p className="text-sm text-gray-400">Admin Panel</p>
+            {isSuperAdmin && (
+              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-orange-500/20 border border-orange-500/30 text-orange-500 rounded text-xs font-medium">
+                <Shield size={12} />
+                Super Admin
+              </span>
+            )}
+          </div>
         </div>
 
         <nav className="p-4 space-y-1">
@@ -126,6 +149,9 @@ export default function AdminLayout({
               >
                 <Icon size={20} />
                 <span>{item.label}</span>
+                {'superAdminOnly' in item && item.superAdminOnly && (
+                  <Shield size={14} className="ml-auto" />
+                )}
               </Link>
             );
           })}

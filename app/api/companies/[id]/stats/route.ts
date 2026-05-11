@@ -24,8 +24,8 @@ export async function GET(
       return authCheck.response;
     }
 
-    // Get stats
-    const stats = await getCompanyStats(id);
+    // Get stats with authenticated Supabase client
+    const stats = await getCompanyStats(id, authCheck.supabase);
 
     if (!stats) {
       return NextResponse.json(
@@ -34,8 +34,8 @@ export async function GET(
       );
     }
 
-    // Get DISC averages
-    const averages = await getCompanyDISCAverages(id);
+    // Get DISC averages with authenticated Supabase client
+    const averages = await getCompanyDISCAverages(id, authCheck.supabase);
 
     return NextResponse.json({
       ...stats,

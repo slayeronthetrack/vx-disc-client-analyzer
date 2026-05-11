@@ -3,7 +3,7 @@
  * Business logic for company DISC tests
  */
 
-import { supabase } from '@/lib/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateDISCScores } from '@/utils/calculateIntegratedProfile';
 import type {
   CompanyTest,
@@ -23,7 +23,7 @@ const EMPLOYEE_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 /**
  * Start a new test (validate company and limits)
  */
-export async function startTest(input: StartTestInput): Promise<{ canStart: boolean; message?: string }> {
+export async function startTest(input: StartTestInput, supabase: SupabaseClient): Promise<{ canStart: boolean; message?: string }> {
 
   // Check if company exists and is active
   const { data: company, error: companyError } = await supabase
@@ -69,13 +69,13 @@ export async function startTest(input: StartTestInput): Promise<{ canStart: bool
 /**
  * Submit completed test
  */
-export async function submitTest(input: SubmitTestInput): Promise<CompanyTest> {
+export async function submitTest(input: SubmitTestInput, supabase: SupabaseClient): Promise<CompanyTest> {
 
   // Validate company and limits first
   const validation = await startTest({ 
     company_id: input.company_id, 
     employee_data: input.employee_data 
-  });
+  }, supabase);
 
   if (!validation.canStart) {
     throw new Error(validation.message || 'Cannot submit test');
@@ -162,7 +162,7 @@ export async function submitTest(input: SubmitTestInput): Promise<CompanyTest> {
 /**
  * Get test by ID
  */
-export async function getTestById(id: string): Promise<CompanyTest | null> {
+export async function getTestById(id: string, supabase: SupabaseClient): Promise<CompanyTest | null> {
 
   const { data, error } = await supabase
     .from('company_tests')
@@ -185,8 +185,12 @@ export async function getTestById(id: string): Promise<CompanyTest | null> {
  */
 export async function getCompanyTests(
   companyId: string,
-  filters?: CompanyTestFilters
+  filters?: CompanyTestFilters,
+  supabase?: SupabaseClient
 ): Promise<CompanyTestListResponse> {
+  if (!supabase) {
+    throw new Error('Supabase client is required');
+  }
 
   // Build query
   let query = supabase
@@ -246,7 +250,8 @@ export async function getCompanyTests(
  */
 export async function getEmployeeTests(
   companyId: string,
-  email: string
+  email: string,
+  supabase: SupabaseClient
 ): Promise<CompanyTest[]> {
 
   const employee_id = generateEmployeeId(email);
@@ -280,7 +285,9 @@ async function generateAIAnalysis(
   employeeData: EmployeeData
 ): Promise<string> {
   try {
-    const response = await fetch('/api/ai/analyze-disc', {
+    // Use absolute URL for server-side fetch
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/ai/analyze-disc`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

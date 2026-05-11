@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCompanyBySlug } from '@/lib/services/companyService';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/companies/by-slug/[slug]
@@ -17,8 +18,11 @@ export async function GET(
   try {
     const { slug } = await params;
 
+    // Create Supabase client (public access, no auth required)
+    const supabase = await createClient();
+
     // Get company (only active companies)
-    const company = await getCompanyBySlug(slug);
+    const company = await getCompanyBySlug(slug, supabase);
 
     if (!company) {
       return NextResponse.json(

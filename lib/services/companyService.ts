@@ -3,7 +3,7 @@
  * Business logic for company management
  */
 
-import { supabase } from '@/lib/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { 
   Company, 
   CreateCompanyInput, 
@@ -17,7 +17,7 @@ import type {
 /**
  * Create a new company
  */
-export async function createCompany(data: CreateCompanyInput): Promise<Company> {
+export async function createCompany(data: CreateCompanyInput, supabase: SupabaseClient): Promise<Company> {
 
   // Validate and format slug
   const slug = formatSlug(data.slug || data.name);
@@ -57,7 +57,10 @@ export async function createCompany(data: CreateCompanyInput): Promise<Company> 
 /**
  * Get all companies with optional filters
  */
-export async function getCompanies(filters?: CompanyFilters): Promise<CompanyListResponse> {
+export async function getCompanies(filters?: CompanyFilters, supabase?: SupabaseClient): Promise<CompanyListResponse> {
+  if (!supabase) {
+    throw new Error('Supabase client is required');
+  }
 
   // Build query
   let query = supabase
@@ -164,7 +167,7 @@ export async function getCompanies(filters?: CompanyFilters): Promise<CompanyLis
 /**
  * Get company by ID
  */
-export async function getCompanyById(id: string): Promise<Company | null> {
+export async function getCompanyById(id: string, supabase: SupabaseClient): Promise<Company | null> {
 
   const { data, error } = await supabase
     .from('companies')
@@ -185,7 +188,7 @@ export async function getCompanyById(id: string): Promise<Company | null> {
 /**
  * Get company by slug (public access)
  */
-export async function getCompanyBySlug(slug: string): Promise<Company | null> {
+export async function getCompanyBySlug(slug: string, supabase: SupabaseClient): Promise<Company | null> {
 
   const { data, error } = await supabase
     .from('companies')
@@ -207,7 +210,7 @@ export async function getCompanyBySlug(slug: string): Promise<Company | null> {
 /**
  * Update company
  */
-export async function updateCompany(id: string, data: UpdateCompanyInput): Promise<Company> {
+export async function updateCompany(id: string, data: UpdateCompanyInput, supabase: SupabaseClient): Promise<Company> {
 
   // If slug is being updated, validate it
   if (data.slug) {
@@ -245,7 +248,7 @@ export async function updateCompany(id: string, data: UpdateCompanyInput): Promi
 /**
  * Delete company
  */
-export async function deleteCompany(id: string): Promise<void> {
+export async function deleteCompany(id: string, supabase: SupabaseClient): Promise<void> {
 
   const { error } = await supabase
     .from('companies')
@@ -260,7 +263,7 @@ export async function deleteCompany(id: string): Promise<void> {
 /**
  * Get company statistics
  */
-export async function getCompanyStats(id: string): Promise<CompanyStats | null> {
+export async function getCompanyStats(id: string, supabase: SupabaseClient): Promise<CompanyStats | null> {
 
   const { data, error } = await supabase
     .from('company_stats')
@@ -281,7 +284,7 @@ export async function getCompanyStats(id: string): Promise<CompanyStats | null> 
 /**
  * Get company DISC averages
  */
-export async function getCompanyDISCAverages(id: string): Promise<CompanyDISCAverages> {
+export async function getCompanyDISCAverages(id: string, supabase: SupabaseClient): Promise<CompanyDISCAverages> {
 
   const { data, error } = await supabase
     .rpc('get_company_disc_averages', { p_company_id: id });
@@ -297,7 +300,7 @@ export async function getCompanyDISCAverages(id: string): Promise<CompanyDISCAve
 /**
  * Check if company can perform more tests
  */
-export async function checkTestLimit(id: string): Promise<boolean> {
+export async function checkTestLimit(id: string, supabase: SupabaseClient): Promise<boolean> {
 
   const { data, error } = await supabase
     .rpc('check_test_limit', { p_company_id: id });
@@ -312,7 +315,7 @@ export async function checkTestLimit(id: string): Promise<boolean> {
 /**
  * Get company test count
  */
-export async function getCompanyTestCount(id: string): Promise<number> {
+export async function getCompanyTestCount(id: string, supabase: SupabaseClient): Promise<number> {
 
   const { data, error } = await supabase
     .rpc('get_company_test_count', { p_company_id: id });

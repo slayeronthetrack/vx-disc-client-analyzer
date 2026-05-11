@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
     // Validate filters
     const validatedFilters = validateData(companyFiltersSchema, filters);
 
-    // Get companies
-    const result = await getCompanies(validatedFilters);
+    // Get companies with authenticated Supabase client
+    const result = await getCompanies(validatedFilters, authCheck.supabase);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = validateData(createCompanySchema, body);
 
-    // Create company
-    const company = await createCompany(validatedData);
+    // Create company with authenticated Supabase client
+    const company = await createCompany(validatedData, authCheck.supabase);
 
     return NextResponse.json(company, { status: 201 });
   } catch (error) {

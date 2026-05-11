@@ -249,7 +249,16 @@ export default function CompaniesListPage() {
                       )}
                       <div>
                         <h3 className="text-white font-bold text-lg">{company.name}</h3>
-                        <p className="text-gray-400 text-sm">/{company.slug}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-gray-400 text-sm">/{company.slug}</p>
+                          <Link
+                            href={`/admin/companies/${company.id}/employees`}
+                            className="inline-flex items-center gap-1 text-purple-500 hover:text-purple-400 text-xs font-medium transition-colors"
+                          >
+                            <Users size={12} />
+                            Ver Funcionários
+                          </Link>
+                        </div>
                       </div>
                     </div>
                     {company.active ? (
@@ -307,26 +316,34 @@ export default function CompaniesListPage() {
                   )}
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <Link
                       href={`/admin/companies/${company.id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-colors text-sm font-medium"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-colors text-sm font-medium"
                     >
                       <Eye size={16} />
                       Ver
                     </Link>
                     <Link
+                      href={`/admin/companies/${company.id}/employees`}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 text-purple-500 rounded-lg hover:bg-purple-500/20 transition-colors text-sm font-medium"
+                    >
+                      <Users size={16} />
+                      Funcionários
+                    </Link>
+                    <Link
                       href={`/admin/companies/${company.id}/edit`}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-lg hover:bg-orange-500/20 transition-colors text-sm font-medium"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-lg hover:bg-orange-500/20 transition-colors text-sm font-medium"
                     >
                       <Edit size={16} />
                       Editar
                     </Link>
                     <button
                       onClick={() => handleDelete(company.id, company.name)}
-                      className="px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors text-sm font-medium"
                     >
                       <Trash2 size={16} />
+                      Deletar
                     </button>
                   </div>
                 </div>

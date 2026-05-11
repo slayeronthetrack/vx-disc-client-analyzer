@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { submitTest } from '@/lib/services/companyTestService';
 import type { SubmitTestInput } from '@/types/company-test';
 import type { Answer, DISCType } from '@/types/database';
@@ -50,6 +51,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Use service role client to bypass RLS (safe because this is server-side only)
+    // This allows public test submission without authentication
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // Prepare input for submitTest
     const submitInput: SubmitTestInput = {
       company_id: body.company_id,
@@ -63,8 +71,8 @@ export async function POST(request: NextRequest) {
       questions: body.questions,
     };
 
-    // Submit test
-    const result = await submitTest(submitInput);
+    // Submit test with Supabase client
+    const result = await submitTest(submitInput, supabase);
 
     return NextResponse.json({
       success: true,

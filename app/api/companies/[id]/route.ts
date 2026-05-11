@@ -31,8 +31,8 @@ export async function GET(
       return authCheck.response;
     }
 
-    // Get company
-    const company = await getCompanyById(id);
+    // Get company with authenticated Supabase client
+    const company = await getCompanyById(id, authCheck.supabase);
 
     if (!company) {
       return NextResponse.json(
@@ -72,8 +72,8 @@ export async function PATCH(
     const body = await request.json();
     const validatedData = validateData(updateCompanySchema, body);
 
-    // Update company
-    const company = await updateCompany(id, validatedData);
+    // Update company with authenticated Supabase client
+    const company = await updateCompany(id, validatedData, authCheck.supabase);
 
     return NextResponse.json(company);
   } catch (error) {
@@ -120,8 +120,8 @@ export async function DELETE(
       return authCheck.response;
     }
 
-    // Delete company
-    await deleteCompany(id);
+    // Delete company with authenticated Supabase client
+    await deleteCompany(id, authCheck.supabase);
 
     return NextResponse.json({ success: true });
   } catch (error) {
