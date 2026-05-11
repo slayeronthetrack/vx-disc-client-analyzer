@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { cache, CacheKeys, CacheTTL } from '@/lib/utils/cache';
 
 export interface CompanyDashboardStats {
   totalTests: number;
@@ -42,6 +43,17 @@ export async function getCompanyDashboardStats(
   companyId: string,
   supabase: SupabaseClient
 ): Promise<CompanyDashboardStats> {
+  // Check cache first
+  const cacheKey = CacheKeys.companyStats(companyId);
+  const cachedStats = cache.get<CompanyDashboardStats>(cacheKey);
+
+  if (cachedStats) {
+    console.log('[getCompanyDashboardStats] Cache hit for company:', companyId);
+    return cachedStats;
+  }
+
+  console.log('[getCompanyDashboardStats] Cache miss, fetching from database');
+
   // Fetch all completed tests for the company (RLS automatically filters by company_id)
   const { data: tests, error } = await supabase
     .from('company_tests')
@@ -111,7 +123,7 @@ export async function getCompanyDashboardStats(
   // In future, this could compare completed vs invited/started tests
   const completionRate = 100; // All fetched tests are completed
 
-  return {
+  const stats: CompanyDashboardStats = {
     totalTests,
     uniqueEmployees,
     averageScores,
@@ -119,4 +131,18 @@ export async function getCompanyDashboardStats(
     testsThisMonth,
     discDistribution,
   };
+
+  // Cache the results for 5 minutes
+  cache.set(cacheKey, stats, CacheTTL.STATS);
+
+  return stats;
+}
+
+/**
+ * Invalidate company dashboard cache
+ * Call this when new tests are completed
+ */
+export function invalidateCompanyDashboardCache(companyId: string): void {
+  cache.invalidatePattern(CacheKeys.companyPattern(companyId));
+  console.log('[invalidateCompanyDashboardCache] Cache invalidated for company:', companyId);
 }

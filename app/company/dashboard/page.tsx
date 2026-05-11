@@ -14,6 +14,7 @@ import { DISCDistributionChart } from '@/components/company/DISCDistributionChar
 import { FilterComponent } from '@/components/company/FilterComponent';
 import { EmployeeTable } from '@/components/company/EmployeeTable';
 import { ExportButton } from '@/components/company/ExportButton';
+import { invalidateCompanyDashboardCache } from '@/lib/services/companyDashboardService';
 import type { CompanyTest } from '@/types/company-test';
 
 interface DashboardStats {
@@ -157,6 +158,11 @@ export default function CompanyDashboardPage() {
           },
           (payload) => {
             console.log('New test completed:', payload);
+            
+            // Invalidate cache
+            if (profile.company_id) {
+              invalidateCompanyDashboardCache(profile.company_id);
+            }
             
             // Show notification
             const notification = document.createElement('div');
