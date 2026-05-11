@@ -20,7 +20,7 @@
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^1.14.0",
-    "next": "^15.1.6",
+    "next": "15.1.11",
     "openai": "^6.36.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.5",
