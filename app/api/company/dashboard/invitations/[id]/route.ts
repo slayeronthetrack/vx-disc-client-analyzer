@@ -10,7 +10,7 @@ import { deleteInvitation } from '@/lib/services/invitationService';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check company admin access
@@ -20,7 +20,7 @@ export async function DELETE(
     }
 
     const { supabase } = authCheck;
-    const invitationId = params.id;
+    const { id: invitationId } = await params;
 
     // Delete invitation (RLS ensures it belongs to the company)
     await deleteInvitation(invitationId, supabase);

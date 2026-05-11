@@ -135,6 +135,7 @@ export async function submitTest(input: SubmitTestInput, supabase: SupabaseClien
       company_id: input.company_id,
       employee_id,
       previous_test_id,
+      invitation_id: input.invitation_id || null,
       name: input.employee_data.name,
       email: input.employee_data.email,
       phone: input.employee_data.phone || null,

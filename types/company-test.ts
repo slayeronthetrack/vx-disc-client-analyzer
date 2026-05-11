@@ -56,6 +56,7 @@ export interface SubmitTestInput {
   answers: Answer[];
   questions: any[];
   started_at?: string;
+  invitation_id?: string;
 }
 
 export interface CompanyTestFilters {

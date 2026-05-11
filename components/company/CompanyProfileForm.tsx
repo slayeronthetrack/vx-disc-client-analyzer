@@ -17,8 +17,6 @@ interface CompanyProfileFormProps {
 export function CompanyProfileForm({ company, onUpdate }: CompanyProfileFormProps) {
   const [formData, setFormData] = useState({
     contact_email: company.contact_email || '',
-    contact_phone: company.contact_phone || '',
-    address: company.address || '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -161,34 +159,6 @@ export function CompanyProfileForm({ company, onUpdate }: CompanyProfileFormProp
             {errors.contact_email && (
               <p className="text-red-500 text-sm mt-1">{errors.contact_email}</p>
             )}
-          </div>
-
-          <div>
-            <label htmlFor="contact_phone" className="block text-sm font-medium text-gray-300 mb-2">
-              Telefone de Contato <span className="text-gray-500">(Opcional)</span>
-            </label>
-            <input
-              type="tel"
-              id="contact_phone"
-              value={formData.contact_phone}
-              onChange={(e) => handleChange('contact_phone', e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition-colors"
-              placeholder="(11) 99999-9999"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="address" className="block text-sm font-medium text-gray-300 mb-2">
-              Endereço <span className="text-gray-500">(Opcional)</span>
-            </label>
-            <textarea
-              id="address"
-              value={formData.address}
-              onChange={(e) => handleChange('address', e.target.value)}
-              rows={3}
-              className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition-colors resize-none"
-              placeholder="Rua, número, bairro, cidade, estado"
-            />
           </div>
         </div>
       </div>

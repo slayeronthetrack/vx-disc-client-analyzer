@@ -37,14 +37,14 @@ export default function CompanyProfilePage() {
 
   // Fetch company data
   useEffect(() => {
-    if (!user || profile?.role !== 'company_admin' || !profile.company_id) return;
+    if (!user || profile?.role !== 'company_admin' || !profile.company) return;
 
     const fetchCompany = async () => {
       try {
         setCompanyLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/companies/${profile.company_id}`);
+        const response = await fetch(`/api/companies/${profile.company}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch company data');
@@ -64,7 +64,7 @@ export default function CompanyProfilePage() {
   }, [user, profile]);
 
   const handleUpdate = async (data: Partial<Company>) => {
-    if (!profile?.company_id) {
+    if (!profile?.company) {
       throw new Error('Company ID not found');
     }
 

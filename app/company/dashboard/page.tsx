@@ -85,6 +85,30 @@ export default function CompanyDashboardPage() {
     }
   }, [user, loading, profile, router]);
 
+  // Fetch dashboard stats
+  const fetchStats = useCallback(async () => {
+    if (!user || profile?.role !== 'company_admin') return;
+
+    try {
+      setStatsLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/company/dashboard/stats');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats');
+      }
+
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [user, profile]);
+
   // Fetch dashboard stats on mount
   useEffect(() => {
     fetchStats();
@@ -138,13 +162,12 @@ export default function CompanyDashboardPage() {
 
   // Real-time updates with Supabase
   useEffect(() => {
-    if (!user || profile?.role !== 'company_admin' || !profile.company_id) return;
+    if (!user || profile?.role !== 'company_admin' || !profile.company) return;
 
     // Import Supabase client
     const setupRealtimeSubscription = async () => {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-
+      const { supabase } = await import('@/lib/supabase/client');
+      
       // Subscribe to INSERT events on company_tests table
       const channel = supabase
         .channel('company_tests_changes')
@@ -154,14 +177,14 @@ export default function CompanyDashboardPage() {
             event: 'INSERT',
             schema: 'public',
             table: 'company_tests',
-            filter: `company_id=eq.${profile.company_id}`,
+            filter: `company_id=eq.${profile.company}`,
           },
           (payload) => {
             console.log('New test completed:', payload);
             
             // Invalidate cache
-            if (profile.company_id) {
-              invalidateCompanyDashboardCache(profile.company_id);
+            if (profile.company) {
+              invalidateCompanyDashboardCache(profile.company);
             }
             
             // Show notification
@@ -237,29 +260,6 @@ export default function CompanyDashboardPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user, profile, fetchStats, fetchTests]);
-
-  const fetchStats = useCallback(async () => {
-    if (!user || profile?.role !== 'company_admin') return;
-
-    try {
-      setStatsLoading(true);
-      setError(null);
-
-      const response = await fetch('/api/company/dashboard/stats');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard stats');
-      }
-
-      const data = await response.json();
-      setStats(data);
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [user, profile]);
 
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);

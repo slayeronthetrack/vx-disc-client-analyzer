@@ -9,7 +9,7 @@ import { sendInvitations, resendInvitation } from '@/lib/services/invitationServ
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check company admin access
@@ -19,7 +19,7 @@ export async function POST(
     }
 
     const { supabase } = authCheck;
-    const invitationId = params.id;
+    const { id: invitationId } = await params;
 
     // Parse body to check if it's a resend
     const body = await request.json().catch(() => ({}));

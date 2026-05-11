@@ -12,7 +12,7 @@ import { getTestById } from '@/lib/services/companyTestService';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Check company admin access
@@ -22,7 +22,7 @@ export async function GET(
     }
 
     const { supabase } = authCheck;
-    const testId = params.id;
+    const { id: testId } = await params;
 
     // Validate test ID format (UUID)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
     };
 
     // Validate page and limit
-    if (filters.page < 1) filters.page = 1;
-    if (filters.limit < 1 || filters.limit > 100) filters.limit = 20;
+    if (filters.page && filters.page < 1) filters.page = 1;
+    if (filters.limit && (filters.limit < 1 || filters.limit > 100)) filters.limit = 20;
 
     // Fetch tests with filters (RLS automatically filters by company_id)
     const result = await getCompanyTests(company_id!, filters, supabase);

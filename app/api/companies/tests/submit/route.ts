@@ -17,12 +17,15 @@ interface RequestBody {
     email: string;
     phone?: string;
     position: string;
+    department?: string;
   };
   answers: Answer[];
   questions: Array<{
     id: number;
     text: string;
   }>;
+  invitation_id?: string | null;
+  invitation_token?: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -66,9 +69,11 @@ export async function POST(request: NextRequest) {
         email: body.employee_data.email,
         phone: body.employee_data.phone,
         position: body.employee_data.position,
+        department: body.employee_data.department,
       },
       answers: body.answers,
       questions: body.questions,
+      invitation_id: body.invitation_id || undefined,
     };
 
     // Submit test with Supabase client
@@ -76,8 +81,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      testId: result.id,
-      dominantProfile: result.disc_result.dominant,
+      test: {
+        id: result.id,
+        dominantProfile: result.disc_result.dominant,
+      },
       message: 'Test submitted successfully',
     });
   } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, ArrowLeft, LogOut } from 'lucide-react';
 import { questions } from '@/data/questions';
 import type { Company } from '@/types/company';
@@ -18,17 +18,33 @@ interface EmployeeData {
   email: string;
   phone?: string;
   position: string;
+  department?: string;
+}
+
+interface InvitationData {
+  id: string;
+  employee_name: string;
+  employee_email: string;
+  employee_position: string | null;
+  employee_department: string | null;
+  status: string;
 }
 
 export default function PublicTestPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
+  const invitationToken = searchParams.get('invitation');
 
   // States
   const [company, setCompany] = useState<Company | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState('');
+
+  // Invitation states
+  const [invitation, setInvitation] = useState<InvitationData | null>(null);
+  const [invitationLoading, setInvitationLoading] = useState(false);
 
   // Test flow states
   const [step, setStep] = useState<'form' | 'test' | 'result'>('form');
@@ -37,6 +53,7 @@ export default function PublicTestPage() {
     email: '',
     phone: '',
     position: '',
+    department: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -46,19 +63,49 @@ export default function PublicTestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Load company on mount
+  // Load company and invitation on mount
   useEffect(() => {
-    const loadCompany = async () => {
+    const loadData = async () => {
       try {
         setCompanyLoading(true);
-        const response = await fetch(`/api/companies/by-slug/${slug}`);
 
-        if (!response.ok) {
+        // Load company
+        const companyResponse = await fetch(`/api/companies/by-slug/${slug}`);
+        if (!companyResponse.ok) {
           throw new Error('Empresa não encontrada ou inativa');
         }
+        const companyData = await companyResponse.json();
+        setCompany(companyData);
 
-        const data = await response.json();
-        setCompany(data);
+        // Load invitation if token present
+        if (invitationToken) {
+          setInvitationLoading(true);
+          try {
+            const invitationResponse = await fetch(`/api/invitations/${invitationToken}`);
+            if (invitationResponse.ok) {
+              const invitationData = await invitationResponse.json();
+              
+              // Verify invitation belongs to this company
+              if (invitationData.company?.id === companyData.id) {
+                setInvitation(invitationData.invitation);
+                
+                // Pre-fill employee data from invitation
+                setEmployeeData({
+                  name: invitationData.invitation.employee_name,
+                  email: invitationData.invitation.employee_email,
+                  phone: '',
+                  position: invitationData.invitation.employee_position || '',
+                  department: invitationData.invitation.employee_department || '',
+                });
+              }
+            }
+          } catch (err) {
+            console.error('Failed to load invitation:', err);
+            // Continue without invitation data
+          } finally {
+            setInvitationLoading(false);
+          }
+        }
       } catch (err) {
         setCompanyError(err instanceof Error ? err.message : 'Erro ao carregar empresa');
       } finally {
@@ -66,8 +113,8 @@ export default function PublicTestPage() {
       }
     };
 
-    loadCompany();
-  }, [slug]);
+    loadData();
+  }, [slug, invitationToken]);
 
   // Form validation
   const validateForm = (): boolean => {
@@ -91,8 +138,22 @@ export default function PublicTestPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleStartTest = () => {
+  const handleStartTest = async () => {
     if (validateForm()) {
+      // Update invitation status to 'started' if invitation exists
+      if (invitation) {
+        try {
+          await fetch(`/api/invitations/${invitationToken}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'started' }),
+          });
+        } catch (err) {
+          console.error('Failed to update invitation status:', err);
+          // Continue anyway
+        }
+      }
+
       setStep('test');
       setCurrentQuestion(0);
       setAnswers([]);
@@ -185,6 +246,8 @@ export default function PublicTestPage() {
             id: q.id,
             text: q.text,
           })),
+          invitation_id: invitation?.id || null,
+          invitation_token: invitationToken || null,
         }),
       });
 
@@ -194,6 +257,24 @@ export default function PublicTestPage() {
       }
 
       const result = await response.json();
+
+      // Update invitation status to 'completed' if invitation exists
+      if (invitation && invitationToken) {
+        try {
+          await fetch(`/api/invitations/${invitationToken}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              status: 'completed',
+              test_id: result.test.id,
+            }),
+          });
+        } catch (err) {
+          console.error('Failed to update invitation status:', err);
+          // Continue anyway
+        }
+      }
+
       setStep('result');
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Erro ao salvar teste');
@@ -203,7 +284,7 @@ export default function PublicTestPage() {
   };
 
   // Loading state
-  if (companyLoading) {
+  if (companyLoading || invitationLoading) {
     return (
       <div className="min-h-screen bg-vx-dark flex items-center justify-center">
         <div className="text-center">
@@ -263,9 +344,20 @@ export default function PublicTestPage() {
       <div className="container mx-auto max-w-2xl px-4 py-12">
         {step === 'form' && (
           <div className="bg-gray-900 rounded-2xl p-8 border border-white/[0.08]">
+            {invitation && (
+              <div className="mb-6 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <p className="text-blue-400 text-sm">
+                  ✓ Você está usando um convite da empresa. Seus dados foram pré-preenchidos.
+                </p>
+              </div>
+            )}
+            
             <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo!</h2>
             <p className="text-gray-400 mb-8">
-              Preencha seus dados para iniciar o teste de diagnóstico comportamental DISC.
+              {invitation 
+                ? 'Confirme seus dados para iniciar o teste de diagnóstico comportamental DISC.'
+                : 'Preencha seus dados para iniciar o teste de diagnóstico comportamental DISC.'
+              }
             </p>
 
             <form
@@ -309,11 +401,12 @@ export default function PublicTestPage() {
                   onChange={e =>
                     setEmployeeData({ ...employeeData, email: e.target.value })
                   }
+                  disabled={!!invitation}
                   className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 ${
                     formErrors.email
                       ? 'border-red-500 focus:ring-red-500'
                       : 'border-white/[0.08] focus:ring-vx-orange'
-                  }`}
+                  } ${invitation ? 'opacity-60 cursor-not-allowed' : ''}`}
                   placeholder="joao@example.com"
                 />
                 {formErrors.email && (
