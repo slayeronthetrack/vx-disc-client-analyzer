@@ -1,14 +1,15 @@
 /**
- * Test API Route (by ID)
- * GET /api/tests/[id] - Get test result by ID
+ * Test API Route
+ * GET /api/tests/[id] - Get test by ID
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getTestById } from '@/lib/services/companyTestService';
+import { checkAdminAccess } from '@/lib/utils/apiAuth';
 
 /**
  * GET /api/tests/[id]
- * Get test result by ID (public access for viewing results)
+ * Get test by ID (admin only)
  */
 export async function GET(
   request: NextRequest,
@@ -17,8 +18,14 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Get test
-    const test = await getTestById(id);
+    // Check admin access
+    const authCheck = await checkAdminAccess();
+    if (!authCheck.authorized) {
+      return authCheck.response;
+    }
+
+    // Get test with authenticated Supabase client
+    const test = await getTestById(id, authCheck.supabase);
 
     if (!test) {
       return NextResponse.json(
