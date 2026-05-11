@@ -13,6 +13,7 @@ import { OverviewCards } from '@/components/company/OverviewCards';
 import { DISCDistributionChart } from '@/components/company/DISCDistributionChart';
 import { FilterComponent } from '@/components/company/FilterComponent';
 import { EmployeeTable } from '@/components/company/EmployeeTable';
+import { ExportButton } from '@/components/company/ExportButton';
 import type { CompanyTest } from '@/types/company-test';
 
 interface DashboardStats {
@@ -214,7 +215,10 @@ export default function CompanyDashboardPage() {
 
         {/* Employee List Placeholder */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white">Lista de Funcionários</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">Lista de Funcionários</h3>
+            <ExportButton filters={filters} />
+          </div>
           
           {/* Filters */}
           <FilterComponent 
