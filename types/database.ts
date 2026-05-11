@@ -3,7 +3,7 @@
  * Types para o banco de dados Supabase
  */
 
-export type UserRole = 'user' | 'admin';
+export type UserRole = 'user' | 'admin' | 'super_admin' | 'company_admin';
 export type DISCType = 'D' | 'I' | 'S' | 'C';
 export type QuestionSource = 'ai' | 'fallback' | 'legacy';
 
