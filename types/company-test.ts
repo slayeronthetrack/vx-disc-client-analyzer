@@ -63,7 +63,7 @@ export interface CompanyTestFilters {
   dominant_profile?: DISCType | 'all';
   department?: string;
   status?: TestStatus;
-  sortBy?: 'created_at' | 'name' | 'email';
+  sortBy?: 'created_at' | 'name' | 'email' | 'position';
   sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
