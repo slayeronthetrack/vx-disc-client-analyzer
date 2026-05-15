@@ -68,10 +68,9 @@ export async function PATCH(
     const supabase = await createClient();
     const { token } = await params;
     const body = await request.json();
-    const { status, test_id } = body;
+    const { status } = body;
 
-    // Validate status
-    const validStatuses = ['pending', 'sent', 'opened', 'started', 'completed', 'expired'];
+    const validStatuses = ['started'];
     if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: 'Invalid status' },
@@ -91,16 +90,8 @@ export async function PATCH(
     // Build update object
     const updateData: any = { status };
 
-    // Add timestamp based on status
     if (status === 'started' && !invitation.started_at) {
       updateData.started_at = new Date().toISOString();
-    } else if (status === 'completed' && !invitation.completed_at) {
-      updateData.completed_at = new Date().toISOString();
-    }
-
-    // Add test_id if provided
-    if (test_id) {
-      updateData.test_id = test_id;
     }
 
     // Update invitation

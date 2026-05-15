@@ -3,7 +3,7 @@
  * Types para o banco de dados Supabase
  */
 
-export type UserRole = 'user' | 'admin' | 'super_admin' | 'company_admin';
+export type UserRole = 'user' | 'employee' | 'admin' | 'super_admin' | 'company_admin';
 export type DISCType = 'D' | 'I' | 'S' | 'C';
 export type QuestionSource = 'ai' | 'fallback' | 'legacy';
 
@@ -15,6 +15,7 @@ export interface Profile {
   role: UserRole;
   job_title?: string;
   company?: string;
+  company_id?: string | null;
   test_objective?: string;
   profile_completed: boolean;
   created_at: string;
@@ -101,7 +102,7 @@ export interface UserState {
 }
 
 // Company Management System Types
-export type UserRoleType = 'user' | 'admin' | 'super_admin' | 'company_admin' | 'manager' | 'viewer';
+export type UserRoleType = UserRole;
 export type TestStatusType = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'EXPIRED' | 'ABANDONED';
 
 export interface Database {

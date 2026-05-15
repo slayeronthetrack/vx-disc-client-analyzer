@@ -14,6 +14,7 @@ import { DISCDistributionChart } from '@/components/company/DISCDistributionChar
 import { FilterComponent } from '@/components/company/FilterComponent';
 import { EmployeeTable } from '@/components/company/EmployeeTable';
 import { ExportButton } from '@/components/company/ExportButton';
+import { Copy, Check, Link as LinkIcon } from 'lucide-react';
 import { invalidateCompanyDashboardCache } from '@/lib/services/companyDashboardService';
 import type { CompanyTest } from '@/types/company-test';
 
@@ -51,6 +52,9 @@ export default function CompanyDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string>('');
+  const [companySlug, setCompanySlug] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   // Employee list state
   const [tests, setTests] = useState<CompanyTest[]>([]);
@@ -85,6 +89,22 @@ export default function CompanyDashboardPage() {
     }
   }, [user, loading, profile, router]);
 
+  // Fetch company info
+  const fetchCompanyInfo = useCallback(async () => {
+    if (!user || profile?.role !== 'company_admin') return;
+
+    try {
+      const response = await fetch('/api/company/dashboard/profile');
+      if (response.ok) {
+        const data = await response.json();
+        setCompanyName(data.company.name);
+        setCompanySlug(data.company.slug);
+      }
+    } catch (err) {
+      console.error('Error fetching company info:', err);
+    }
+  }, [user, profile]);
+
   // Fetch dashboard stats
   const fetchStats = useCallback(async () => {
     if (!user || profile?.role !== 'company_admin') return;
@@ -109,10 +129,11 @@ export default function CompanyDashboardPage() {
     }
   }, [user, profile]);
 
-  // Fetch dashboard stats on mount
+  // Fetch company info and dashboard stats on mount
   useEffect(() => {
+    fetchCompanyInfo();
     fetchStats();
-  }, [fetchStats]);
+  }, [fetchCompanyInfo, fetchStats]);
 
   // Fetch employee tests
   const fetchTests = useCallback(async () => {
@@ -162,12 +183,14 @@ export default function CompanyDashboardPage() {
 
   // Real-time updates with Supabase
   useEffect(() => {
-    if (!user || profile?.role !== 'company_admin' || !profile.company) return;
+    if (!user || profile?.role !== 'company_admin' || !profile.company_id) return;
+
+    const companyId = profile.company_id;
 
     // Import Supabase client
     const setupRealtimeSubscription = async () => {
       const { supabase } = await import('@/lib/supabase/client');
-      
+
       // Subscribe to INSERT events on company_tests table
       const channel = supabase
         .channel('company_tests_changes')
@@ -177,15 +200,13 @@ export default function CompanyDashboardPage() {
             event: 'INSERT',
             schema: 'public',
             table: 'company_tests',
-            filter: `company_id=eq.${profile.company}`,
+            filter: `company_id=eq.${companyId}`,
           },
           (payload) => {
             console.log('New test completed:', payload);
-            
+
             // Invalidate cache
-            if (profile.company) {
-              invalidateCompanyDashboardCache(profile.company);
-            }
+            invalidateCompanyDashboardCache(companyId);
             
             // Show notification
             const notification = document.createElement('div');
@@ -261,6 +282,28 @@ export default function CompanyDashboardPage() {
     };
   }, [user, profile, fetchStats, fetchTests]);
 
+  const inviteLink = companySlug
+    ? `${window.location.origin}/test/${companySlug}`
+    : '';
+
+  const handleCopyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = inviteLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [inviteLink]);
+
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
     setTestsPage(1); // Reset to first page when filters change
@@ -288,12 +331,34 @@ export default function CompanyDashboardPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Dashboard da Empresa
-          </h1>
-          <p className="text-gray-400">
-            Visão geral dos testes DISC dos seus funcionários
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-1">
+                {companyName || 'Dashboard da Empresa'}
+              </h1>
+              <p className="text-gray-400">
+                Visão geral dos testes DISC dos seus funcionários
+              </p>
+            </div>
+            {inviteLink && (
+              <div className="glass rounded-xl px-4 py-3 flex items-center gap-3">
+                <LinkIcon size={18} className="text-orange-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500 mb-0.5">Link de Convite</p>
+                  <p className="text-sm text-gray-300 truncate max-w-[200px] lg:max-w-[300px]">
+                    {inviteLink}
+                  </p>
+                </div>
+                <button
+                  onClick={handleCopyLink}
+                  className="shrink-0 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-500 text-sm font-medium transition-all flex items-center gap-1.5"
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Error Message */}

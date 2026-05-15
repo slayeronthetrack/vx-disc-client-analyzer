@@ -6,12 +6,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, Upload, X, Check } from 'lucide-react';
-import type { Company, CreateCompanyInput } from '@/types/company';
+import { Building2, Check, KeyRound } from 'lucide-react';
+import type { Company, CreateCompanyInput, CreateCompanyWithAdminInput } from '@/types/company';
 
 interface CompanyFormProps {
   company?: Company;
-  onSubmit: (data: CreateCompanyInput) => Promise<void>;
+  onSubmit: (data: CreateCompanyInput | CreateCompanyWithAdminInput) => Promise<void>;
   onCancel: () => void;
   isEdit?: boolean;
 }
@@ -31,6 +31,12 @@ export function CompanyForm({ company, onSubmit, onCancel, isEdit = false }: Com
     contact_email: company?.contact_email || '',
     max_tests: company?.max_tests ?? 100,
     active: company?.active ?? true,
+  });
+
+  const [adminAccess, setAdminAccess] = useState({
+    admin_full_name: '',
+    admin_email: '',
+    admin_password: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -93,6 +99,24 @@ export function CompanyForm({ company, onSubmit, onCancel, isEdit = false }: Com
       newErrors.max_tests = 'Limite de testes não pode ser negativo';
     }
 
+    if (!isEdit) {
+      if (!adminAccess.admin_full_name.trim()) {
+        newErrors.admin_full_name = 'Nome do administrador é obrigatório';
+      }
+
+      if (!adminAccess.admin_email.trim()) {
+        newErrors.admin_email = 'Email de acesso é obrigatório';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminAccess.admin_email)) {
+        newErrors.admin_email = 'Email de acesso inválido';
+      }
+
+      if (!adminAccess.admin_password) {
+        newErrors.admin_password = 'Senha temporária é obrigatória';
+      } else if (adminAccess.admin_password.length < 8) {
+        newErrors.admin_password = 'Senha temporária deve ter pelo menos 8 caracteres';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -106,12 +130,29 @@ export function CompanyForm({ company, onSubmit, onCancel, isEdit = false }: Com
 
     setLoading(true);
     try {
-      await onSubmit(formData);
+      const submitData = isEdit
+        ? formData
+        : {
+            ...formData,
+            admin_access: adminAccess,
+          };
+      await onSubmit(submitData);
     } catch (error) {
       console.error('Error submitting form:', error);
       alert(error instanceof Error ? error.message : 'Erro ao salvar empresa');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAdminAccessChange = (field: keyof typeof adminAccess, value: string) => {
+    setAdminAccess(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
@@ -324,6 +365,74 @@ export function CompanyForm({ company, onSubmit, onCancel, isEdit = false }: Com
           </div>
         </div>
       </div>
+
+      {!isEdit && (
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
+          <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <KeyRound size={24} />
+            Dados de acesso da empresa
+          </h3>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Nome do administrador *
+              </label>
+              <input
+                type="text"
+                value={adminAccess.admin_full_name}
+                onChange={(e) => handleAdminAccessChange('admin_full_name', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-900 border ${
+                  errors.admin_full_name ? 'border-red-500' : 'border-gray-700'
+                } rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500`}
+                placeholder="João Silva"
+              />
+              {errors.admin_full_name && (
+                <p className="mt-1 text-sm text-red-500">{errors.admin_full_name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Email de acesso *
+              </label>
+              <input
+                type="email"
+                value={adminAccess.admin_email}
+                onChange={(e) => handleAdminAccessChange('admin_email', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-900 border ${
+                  errors.admin_email ? 'border-red-500' : 'border-gray-700'
+                } rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500`}
+                placeholder="admin@empresa.com"
+              />
+              {errors.admin_email && (
+                <p className="mt-1 text-sm text-red-500">{errors.admin_email}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Senha temporária *
+              </label>
+              <input
+                type="password"
+                value={adminAccess.admin_password}
+                onChange={(e) => handleAdminAccessChange('admin_password', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-900 border ${
+                  errors.admin_password ? 'border-red-500' : 'border-gray-700'
+                } rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500`}
+                placeholder="Mínimo 8 caracteres"
+              />
+              {errors.admin_password && (
+                <p className="mt-1 text-sm text-red-500">{errors.admin_password}</p>
+              )}
+              <p className="mt-1 text-sm text-gray-500">
+                A senha será exibida somente após a criação e não será salva em tabelas públicas.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contact Information */}
       <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6">

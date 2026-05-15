@@ -21,6 +21,42 @@ const CompanyProfileUpdateSchema = z.object({
 // Restricted fields that company_admin cannot update
 const RESTRICTED_FIELDS = ['name', 'slug', 'max_tests', 'active', 'logo_url', 'primary_color', 'font_family'];
 
+/**
+ * GET /api/company/dashboard/profile
+ * Fetch company profile info (name, slug, etc.)
+ */
+export async function GET() {
+  try {
+    const authCheck = await checkCompanyAdminAccess();
+    if (!authCheck.authorized) {
+      return authCheck.response;
+    }
+
+    const { supabase, profile } = authCheck;
+
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('id, name, slug, logo_url, primary_color')
+      .eq('id', profile.company_id)
+      .single();
+
+    if (error || !company) {
+      return NextResponse.json(
+        { error: 'Company not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ company });
+  } catch (error) {
+    console.error('[API /company/dashboard/profile] Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch company profile' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     // Check company admin access

@@ -38,6 +38,26 @@ export interface CreateCompanyInput {
   active?: boolean;
 }
 
+export interface CompanyAccessInput {
+  admin_full_name: string;
+  admin_email: string;
+  admin_password: string;
+}
+
+export interface CreateCompanyWithAdminInput extends CreateCompanyInput {
+  admin_access: CompanyAccessInput;
+}
+
+export interface CreateCompanyWithAdminResponse {
+  company: Company;
+  access: {
+    admin_full_name: string;
+    admin_email: string;
+    temporary_password: string;
+    login_url: string;
+  };
+}
+
 export interface UpdateCompanyInput {
   name?: string;
   slug?: string;

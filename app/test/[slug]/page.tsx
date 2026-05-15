@@ -139,6 +139,11 @@ export default function PublicTestPage() {
   };
 
   const handleStartTest = async () => {
+    if (!invitationToken || !invitation) {
+      setFormErrors({ submit: 'Este teste só pode ser iniciado por um convite válido.' });
+      return;
+    }
+
     if (validateForm()) {
       // Update invitation status to 'started' if invitation exists
       if (invitation) {
@@ -226,7 +231,7 @@ export default function PublicTestPage() {
   };
 
   const handleSubmitTest = async () => {
-    if (!company || !hasMinimumAnswers) return;
+    if (!company || !hasMinimumAnswers || !invitationToken) return;
 
     setSubmitting(true);
     setSubmitError('');
@@ -236,7 +241,7 @@ export default function PublicTestPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          company_id: company.id,
+          company_slug: slug,
           employee_data: employeeData,
           answers: answers.map(a => ({
             questionId: a.questionId,
@@ -246,33 +251,13 @@ export default function PublicTestPage() {
             id: q.id,
             text: q.text,
           })),
-          invitation_id: invitation?.id || null,
-          invitation_token: invitationToken || null,
+          invitation_token: invitationToken,
         }),
       });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Erro ao salvar teste');
-      }
-
-      const result = await response.json();
-
-      // Update invitation status to 'completed' if invitation exists
-      if (invitation && invitationToken) {
-        try {
-          await fetch(`/api/invitations/${invitationToken}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              status: 'completed',
-              test_id: result.test.id,
-            }),
-          });
-        } catch (err) {
-          console.error('Failed to update invitation status:', err);
-          // Continue anyway
-        }
       }
 
       setStep('result');
@@ -354,9 +339,9 @@ export default function PublicTestPage() {
             
             <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo!</h2>
             <p className="text-gray-400 mb-8">
-              {invitation 
+              {invitation
                 ? 'Confirme seus dados para iniciar o teste de diagnóstico comportamental DISC.'
-                : 'Preencha seus dados para iniciar o teste de diagnóstico comportamental DISC.'
+                : 'Este teste só pode ser iniciado por um convite válido.'
               }
             </p>
 
@@ -453,10 +438,17 @@ export default function PublicTestPage() {
                 )}
               </div>
 
+              {formErrors.submit && (
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-sm">
+                  {formErrors.submit}
+                </div>
+              )}
+
               {/* Submit button */}
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-vx-orange to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-vx-orange/50 transition-all duration-300 flex items-center justify-center gap-2"
+                disabled={!invitation}
+                className="w-full py-3 bg-gradient-to-r from-vx-orange to-orange-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-vx-orange/50 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Iniciar Teste
                 <ArrowRight size={18} />

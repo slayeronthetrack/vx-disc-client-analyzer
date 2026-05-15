@@ -10,7 +10,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, User, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService } from '@/lib/services/authService';
+import { profileService } from '@/lib/services/profileService';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { getRedirectPathByRole } from '@/utils/auth';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -68,9 +70,18 @@ export default function RegisterPage() {
 
       setSuccess(true);
 
-      // Aguardar 2 segundos e redirecionar
-      setTimeout(() => {
-        router.push('/profile');
+      // Aguardar 2 segundos, buscar perfil e redirecionar por role
+      setTimeout(async () => {
+        const session = await authService.getSession();
+        let redirectPath = '/profile';
+        if (session?.user) {
+          const profile = await profileService.getProfile(session.user.id);
+          redirectPath = getRedirectPathByRole(
+            profile?.role,
+            profile?.profile_completed
+          );
+        }
+        router.push(redirectPath);
       }, 2000);
     } catch (err: any) {
       console.error('Register error:', err);

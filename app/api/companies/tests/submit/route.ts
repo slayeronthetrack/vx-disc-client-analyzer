@@ -1,17 +1,18 @@
 /**
  * API Route - Submit Company Test
  * POST /api/companies/tests/submit
- * Public route for submitting DISC tests via company slug
+ * Public route for submitting DISC tests via invitation token
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { submitTest } from '@/lib/services/companyTestService';
+import { getInvitationByToken } from '@/lib/services/invitationService';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { SubmitTestInput } from '@/types/company-test';
-import type { Answer, DISCType } from '@/types/database';
+import type { Answer } from '@/types/database';
 
 interface RequestBody {
-  company_id: string;
+  company_slug?: string;
   employee_data: {
     name: string;
     email: string;
@@ -28,14 +29,17 @@ interface RequestBody {
   invitation_token?: string | null;
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: RequestBody = await request.json();
 
-    // Validate required fields
-    if (!body.company_id) {
+    if (!body.invitation_token?.trim()) {
       return NextResponse.json(
-        { error: 'Company ID is required' },
+        { error: 'Invitation token is required' },
         { status: 400 }
       );
     }
@@ -54,30 +58,126 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use service role client to bypass RLS (safe because this is server-side only)
-    // This allows public test submission without authentication
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = createAdminClient();
+    const invitation = await getInvitationByToken(body.invitation_token.trim(), supabase);
 
-    // Prepare input for submitTest
+    if (!invitation) {
+      return NextResponse.json(
+        { error: 'Invitation not found or expired' },
+        { status: 404 }
+      );
+    }
+
+    if (invitation.status === 'completed' || invitation.status === 'expired' || invitation.test_id) {
+      return NextResponse.json(
+        { error: 'Invitation is no longer available' },
+        { status: 409 }
+      );
+    }
+
+    const invitationStatusBeforeSubmit = invitation.status;
+
+    if (body.company_slug) {
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('slug')
+        .eq('id', invitation.company_id)
+        .single();
+
+      if (companyError || !company) {
+        return NextResponse.json(
+          { error: 'Company not found' },
+          { status: 404 }
+        );
+      }
+
+      if (company.slug !== body.company_slug) {
+        return NextResponse.json(
+          { error: 'Invitation does not belong to the submitted company' },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (body.invitation_id && body.invitation_id !== invitation.id) {
+      return NextResponse.json(
+        { error: 'Invitation ID does not match token' },
+        { status: 403 }
+      );
+    }
+
+    if (normalizeEmail(body.employee_data.email) !== normalizeEmail(invitation.employee_email)) {
+      return NextResponse.json(
+        { error: 'Employee email does not match invitation' },
+        { status: 403 }
+      );
+    }
+
+    const { data: claimedInvitation, error: claimError } = await supabase
+      .from('test_invitations')
+      .update({ status: 'completed' })
+      .eq('id', invitation.id)
+      .eq('company_id', invitation.company_id)
+      .is('test_id', null)
+      .neq('status', 'completed')
+      .neq('status', 'expired')
+      .select('id')
+      .single();
+
+    if (claimError || !claimedInvitation) {
+      return NextResponse.json(
+        { error: 'Invitation is no longer available' },
+        { status: 409 }
+      );
+    }
+
     const submitInput: SubmitTestInput = {
-      company_id: body.company_id,
+      company_id: invitation.company_id,
       employee_data: {
-        name: body.employee_data.name,
-        email: body.employee_data.email,
+        name: invitation.employee_name,
+        email: normalizeEmail(invitation.employee_email),
         phone: body.employee_data.phone,
-        position: body.employee_data.position,
-        department: body.employee_data.department,
+        position: invitation.employee_position || body.employee_data.position,
+        department: invitation.employee_department || body.employee_data.department,
       },
       answers: body.answers,
       questions: body.questions,
-      invitation_id: body.invitation_id || undefined,
+      invitation_id: invitation.id,
     };
 
-    // Submit test with Supabase client
-    const result = await submitTest(submitInput, supabase);
+    let result;
+    try {
+      result = await submitTest(submitInput, supabase);
+    } catch (error) {
+      await supabase
+        .from('test_invitations')
+        .update({
+          status: invitationStatusBeforeSubmit,
+          completed_at: null,
+        })
+        .eq('id', invitation.id)
+        .eq('company_id', invitation.company_id)
+        .is('test_id', null);
+
+      throw error;
+    }
+
+    const { error: invitationUpdateError } = await supabase
+      .from('test_invitations')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        test_id: result.id,
+      })
+      .eq('id', invitation.id)
+      .eq('company_id', invitation.company_id)
+      .is('test_id', null)
+      .select('id')
+      .single();
+
+    if (invitationUpdateError) {
+      throw new Error(`Failed to update invitation status: ${invitationUpdateError.message}`);
+    }
 
     return NextResponse.json({
       success: true,
@@ -92,7 +192,6 @@ export async function POST(request: NextRequest) {
 
     const message = error instanceof Error ? error.message : 'Failed to submit test';
 
-    // Check if it's a limit error
     if (message.includes('reached its test limit')) {
       return NextResponse.json(
         { error: message },

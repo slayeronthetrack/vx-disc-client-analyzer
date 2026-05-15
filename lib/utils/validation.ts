@@ -40,6 +40,14 @@ export const createCompanySchema = z.object({
   active: z.boolean().optional().default(true),
 });
 
+export const createCompanyWithAdminSchema = createCompanySchema.extend({
+  admin_access: z.object({
+    admin_full_name: z.string().min(1, 'Administrator name is required').max(100, 'Administrator name is too long'),
+    admin_email: z.string().email('Invalid administrator email address'),
+    admin_password: z.string().min(8, 'Temporary password must be at least 8 characters'),
+  }),
+});
+
 export const updateCompanySchema = createCompanySchema.partial();
 
 export const companyFiltersSchema = z.object({

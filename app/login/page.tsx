@@ -13,10 +13,15 @@ import { authService } from '@/lib/services/authService';
 import { profileService } from '@/lib/services/profileService';
 import { discTestService } from '@/lib/services/discTestService';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { 
+  getRedirectPathByRole, 
+  getRoleLabel,
+  isValidRole 
+} from '@/lib/auth/permissions';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading: authLoading, refreshState } = useAuth();
+  const { user, profile, loading: authLoading, refreshState } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,12 +30,27 @@ export default function LoginPage() {
 
   // Redirecionar se já estiver logado
   useEffect(() => {
-    if (!authLoading && user && !isRedirecting) {
-      console.log('[Login] User already logged in, redirecting to /profile');
+    if (authLoading || !user || isRedirecting) return;
+
+    if (!profile) {
+      console.log('[Login] User already logged in without profile, redirecting to /profile');
       setIsRedirecting(true);
       router.push('/profile');
+      return;
     }
-  }, [user, authLoading]);
+
+    if (!isValidRole(profile.role)) {
+      console.warn('[Login] User already logged in with invalid role, redirecting to /profile');
+      setIsRedirecting(true);
+      router.push('/profile');
+      return;
+    }
+
+    const redirectPath = getRedirectPathByRole(profile.role, profile.profile_completed);
+    console.log('[Login] User already logged in, redirecting by role:', redirectPath);
+    setIsRedirecting(true);
+    router.push(redirectPath);
+  }, [user, profile, authLoading, isRedirecting, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,19 +70,61 @@ export default function LoginPage() {
         throw new Error('Preencha todos os campos');
       }
 
-      console.log('[Login] Attempting login...');
+      console.log('[Login] Attempting login...', { email });
       const startTime = Date.now();
       
-      // Login
+      // 1. Fazer login no Supabase Auth
       const result = await authService.signIn(email, password);
       const loginTime = Date.now() - startTime;
+      const userId = result.user?.id;
       
-      console.log('[Login] Login successful in', loginTime, 'ms, user:', result.user?.id);
+      console.log('[Login] Auth successful in', loginTime, 'ms', { userId });
+
+      // 2. Buscar perfil do usuário para obter role e status
+      console.log('[Login] Fetching user profile...');
+      const profile = await profileService.getProfile(userId!);
       
-      // Redirecionar imediatamente para /profile
-      // O middleware vai garantir que a sessão está válida
-      console.log('[Login] Redirecting to /profile...');
-      router.push('/profile');
+      if (!profile) {
+        console.warn('[Login] Profile not found for user:', userId);
+        // Usuário autenticado mas sem perfil, ir para profile
+        router.push('/profile');
+        return;
+      }
+
+      // 3. Validar role
+      const role = profile.role as string;
+      const isValidRoleValue = isValidRole(role);
+      
+      console.log('[Login] User profile loaded', {
+        userId,
+        role,
+        isValidRole: isValidRoleValue,
+        profileCompleted: profile.profile_completed,
+        companyId: profile.company_id,
+      });
+
+      if (!isValidRoleValue) {
+        console.warn('[Login] Invalid or missing role for user:', { userId, role });
+        // Role inválida, ir para profile para completar
+        router.push('/profile');
+        return;
+      }
+
+      // 4. Determinar redirecionamento baseado na role
+      const redirectPath = getRedirectPathByRole(
+        role as any,
+        profile.profile_completed
+      );
+      
+      console.log('[Login] Login successful - Redirecting', {
+        role,
+        roleLabel: getRoleLabel(role as any),
+        path: redirectPath,
+        profileCompleted: profile.profile_completed,
+      });
+
+      // 5. Redirecionar
+      router.push(redirectPath);
       
     } catch (err: any) {
       console.error('[Login] Login error:', err);

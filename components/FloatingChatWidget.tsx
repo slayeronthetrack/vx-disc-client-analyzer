@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Sparkles, Trash2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { apiGet, apiPost } from '@/lib/utils/apiClient';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -64,7 +65,7 @@ export default function FloatingChatWidget({ onClose, initialOpen = false }: Flo
 
     try {
       setLoadingHistory(true);
-      const response = await fetch(`/api/ai/chat?userId=${user.id}`);
+      const response = await apiGet('/api/ai/chat');
       const data = await response.json();
 
       if (data.history && data.history.length > 0) {
@@ -108,14 +109,9 @@ export default function FloatingChatWidget({ onClose, initialOpen = false }: Flo
     setMessages((prev) => [...prev, { role: 'user', content: textToSend }]);
 
     try {
-      // Chamar API
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: textToSend,
-          userId: user.id,
-        }),
+      // Chamar API autenticada
+      const response = await apiPost('/api/ai/chat', {
+        message: textToSend,
       });
 
       const data = await response.json();

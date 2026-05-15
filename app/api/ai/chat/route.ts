@@ -5,19 +5,9 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 import { getAgentRegistry } from '@/lib/agents';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-// Cliente com service role para bypass RLS
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
 
 interface ChatMessage {
   id?: string;
@@ -83,9 +73,40 @@ const profileContexts = {
   },
 };
 
-async function getHistory(userId: string, limit: number = 50): Promise<ChatMessage[]> {
+async function authorizeChatRequest(clientUserId?: string | null) {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return {
+      authorized: false as const,
+      response: NextResponse.json(
+        { error: 'Unauthorized - Authentication required' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (clientUserId && clientUserId !== user.id) {
+    return {
+      authorized: false as const,
+      response: NextResponse.json(
+        { error: 'Forbidden - userId does not match authenticated user' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    authorized: true as const,
+    supabase,
+    userId: user.id,
+  };
+}
+
+async function getHistory(supabase: SupabaseClient, userId: string, limit: number = 50): Promise<ChatMessage[]> {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('ai_chat_messages')
       .select('*')
       .eq('user_id', userId)
@@ -107,9 +128,9 @@ async function getHistory(userId: string, limit: number = 50): Promise<ChatMessa
   }
 }
 
-async function saveMessage(message: ChatMessage): Promise<void> {
+async function saveMessage(supabase: SupabaseClient, message: ChatMessage): Promise<void> {
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('ai_chat_messages')
       .insert({
         user_id: message.user_id,
@@ -127,9 +148,9 @@ async function saveMessage(message: ChatMessage): Promise<void> {
   }
 }
 
-async function getDISCContext(userId: string): Promise<ChatMessage['disc_context']> {
+async function getDISCContext(supabase: SupabaseClient, userId: string): Promise<ChatMessage['disc_context']> {
   try {
-    const { data: test } = await supabaseAdmin
+    const { data: test } = await supabase
       .from('disc_tests')
       .select('dominant_profile, scores, value_scores, dominant_values, value_percentages, psychological_profile, integrated_analysis, ai_analysis')
       .eq('user_id', userId)
@@ -150,6 +171,7 @@ async function getDISCContext(userId: string): Promise<ChatMessage['disc_context
 }
 
 async function generateAIResponse(
+  supabase: SupabaseClient,
   userMessage: string,
   discContext: ChatMessage['disc_context'] | null,
   history: ChatMessage[],
@@ -179,7 +201,7 @@ async function generateAIResponse(
     
     if (discContext) {
       try {
-        const { data: test } = await supabaseAdmin
+        const { data: test } = await supabase
           .from('disc_tests')
           .select('integrated_analysis, ai_analysis, value_scores, dominant_values, value_percentages, psychological_profile')
           .eq('user_id', userId)
@@ -332,20 +354,33 @@ function getSuggestions(discContext: ChatMessage['disc_context'] | null): string
 
 export async function POST(request: Request) {
   try {
-    const { message, userId } = await request.json();
+    const authCheck = await authorizeChatRequest();
+    if (!authCheck.authorized) {
+      return authCheck.response;
+    }
 
-    if (!message || !userId) {
+    const { message, userId: clientUserId } = await request.json();
+    if (clientUserId && clientUserId !== authCheck.userId) {
       return NextResponse.json(
-        { error: 'Mensagem e userId são obrigatórios' },
+        { error: 'Forbidden - userId does not match authenticated user' },
+        { status: 403 }
+      );
+    }
+
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Mensagem é obrigatória' },
         { status: 400 }
       );
     }
 
-    // Buscar perfil do usuário
-    const { data: profile } = await supabaseAdmin
+    const { supabase, userId } = authCheck;
+
+    // Buscar perfil do usuário autenticado
+    const { data: profile } = await supabase
       .from('profiles')
       .select('full_name, job_title, company')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single();
 
     const userName = profile?.full_name || 'Cliente';
@@ -353,13 +388,13 @@ export async function POST(request: Request) {
     const company = profile?.company;
 
     // Buscar histórico
-    const history = await getHistory(userId, 10);
+    const history = await getHistory(supabase, userId, 10);
 
     // Buscar contexto DISC
-    const discContext = await getDISCContext(userId);
+    const discContext = await getDISCContext(supabase, userId);
 
     // Salvar mensagem do usuário
-    await saveMessage({
+    await saveMessage(supabase, {
       user_id: userId,
       role: 'user',
       content: message,
@@ -369,14 +404,14 @@ export async function POST(request: Request) {
     // Gerar resposta com Lucas (Agente IA)
     let response: string;
     try {
-      response = await generateAIResponse(message, discContext, history, userName, userId, jobTitle, company);
+      response = await generateAIResponse(supabase, message, discContext, history, userName, userId, jobTitle, company);
     } catch (error) {
       console.error('Lucas agent error, using fallback:', error);
       response = generateFallbackResponse(message, discContext);
     }
 
     // Salvar resposta da IA
-    await saveMessage({
+    await saveMessage(supabase, {
       user_id: userId,
       role: 'assistant',
       content: response,
@@ -398,7 +433,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Chat error:', error);
-    
+
     return NextResponse.json({
       response: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
       suggestions: [
@@ -418,20 +453,18 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId é obrigatório' },
-        { status: 400 }
-      );
+    const authCheck = await authorizeChatRequest(searchParams.get('userId'));
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
+    const { supabase, userId } = authCheck;
+
     // Buscar histórico
-    const history = await getHistory(userId);
+    const history = await getHistory(supabase, userId);
 
     // Buscar contexto DISC
-    const discContext = await getDISCContext(userId);
+    const discContext = await getDISCContext(supabase, userId);
 
     // Gerar sugestões
     const suggestions = getSuggestions(discContext);

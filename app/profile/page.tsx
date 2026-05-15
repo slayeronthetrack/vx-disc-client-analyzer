@@ -12,6 +12,7 @@ import { Save, ArrowLeft, CheckCircle, AlertCircle, History, Eye } from 'lucide-
 import { useAuth } from '@/lib/hooks/useAuth';
 import { profileService } from '@/lib/services/profileService';
 import { discTestService } from '@/lib/services/discTestService';
+import { getRedirectPathByRole } from '@/utils/auth';
 import type { TestHistorySummary } from '@/types/history';
 
 export default function ProfilePage() {
@@ -100,9 +101,13 @@ export default function ProfilePage() {
       // Mostrar sucesso
       setShowSuccess(true);
 
-      // Redirecionar após 2 segundos
+      // Redirecionar após 2 segundos conforme role
       setTimeout(() => {
-        router.push('/test');
+        const redirectPath = getRedirectPathByRole(
+          userProfile?.role,
+          true
+        );
+        router.push(redirectPath);
       }, 2000);
     } catch (err: any) {
       console.error('Profile update error:', err);

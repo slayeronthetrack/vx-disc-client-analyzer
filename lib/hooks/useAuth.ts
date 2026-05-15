@@ -114,8 +114,8 @@ export function useAuth() {
       const profile = await profileService.getProfile(user.id);
       console.log('[useAuth] Profile:', profile ? 'Found' : 'Not found');
       
-      // Aceitar admin, super_admin, company_admin como admin
-      const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'company_admin';
+      // Global admin flag: company_admin is scoped to /company and is not a global admin.
+      const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
       const hasProfile = profile?.profile_completed || false;
 
       // NÃO buscar teste aqui - deixar para as páginas específicas fazerem isso
@@ -170,6 +170,22 @@ export function useAuth() {
     return true;
   };
 
+  const getUserRole = () => state.profile?.role || null;
+
+  const requireRole = (
+    allowedRoles: string[],
+    redirectTo: string = '/'
+  ) => {
+    if (!state.loading && state.user) {
+      const role = getUserRole();
+      if (!role || !allowedRoles.includes(role)) {
+        router.push(redirectTo);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -193,6 +209,8 @@ export function useAuth() {
     requireAuth,
     requireProfile,
     requireAdmin,
+    getUserRole,
+    requireRole,
     signOut,
   };
 }
