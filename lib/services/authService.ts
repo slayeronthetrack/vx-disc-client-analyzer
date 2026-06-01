@@ -8,15 +8,21 @@ import { supabase } from '../supabase/client';
 export const authService = {
   /**
    * Criar nova conta
+   * Aceita email completo ou username (adiciona @interno.vx automaticamente)
    */
   async signUp(email: string, password: string, fullName: string) {
+    // Se não tem @, adicionar sufixo interno
+    const normalizedEmail = email.includes('@') ? email : `${email}@interno.vx`;
+    console.log('[authService] signUp with normalized email:', normalizedEmail);
+    
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
           full_name: fullName,
         },
+        emailRedirectTo: undefined, // Desabilitar confirmação por email
       },
     });
 
@@ -26,14 +32,19 @@ export const authService = {
 
   /**
    * Login
+   * Aceita email completo ou username (adiciona @interno.vx automaticamente)
    */
   async signIn(email: string, password: string) {
     console.log('[authService] Starting signIn...', { email });
     const startTime = Date.now();
     
+    // Se não tem @, adicionar sufixo interno
+    const normalizedEmail = email.includes('@') ? email : `${email}@interno.vx`;
+    console.log('[authService] Normalized email:', normalizedEmail);
+    
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
       

@@ -41,10 +41,12 @@ export default function RegisterPage() {
     }
 
     if (!email.trim()) {
-      throw new Error('E-mail é obrigatório');
+      throw new Error('E-mail ou usuário é obrigatório');
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // Aceitar email completo OU username simples
+    // Se tem @, validar formato de email
+    if (email.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       throw new Error('E-mail inválido');
     }
 
@@ -169,20 +171,23 @@ export default function RegisterPage() {
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-white font-medium mb-2">
-                E-mail *
+                E-mail ou Usuário *
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                 <input
-                  type="email"
+                  type="text"
                   id="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
-                  placeholder="seu@email.com"
+                  placeholder="seu@email.com ou usuario"
                   required
                 />
               </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Pode usar email completo ou apenas um nome de usuário
+              </p>
             </div>
 
             {/* Senha */}
